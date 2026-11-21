@@ -19,6 +19,7 @@
   </header>
   <nav class="tabs" role="tablist">
     <button type="button" class="tab on" data-tab="job">Match</button>
+    <button type="button" class="tab" data-tab="jobs">Jobs</button>
     <button type="button" class="tab" data-tab="fill">Autofill</button>
     <button type="button" class="tab" data-tab="profile">Profile</button>
     <button type="button" class="tab" data-tab="settings">Settings</button>
@@ -34,7 +35,7 @@
       <textarea id="jd" spellcheck="true" placeholder="Paste a job description, or read it from the open tab."></textarea>
       <div class="row">
         <button type="button" class="primary" id="analyze">Score match</button>
-        <button type="button" class="primary" id="tailor">Tailor resume</button>
+        <button type="button" class="primary" id="tailor">Tailor for this job</button>
       </div>
       <p id="job-status" class="status"></p>
       <div id="score-card" class="card" hidden>
@@ -47,17 +48,28 @@
         </div>
         <h3>On your resume</h3>
         <div id="matched" class="chips"></div>
-        <h3>Missing — add only if true</h3>
+        <h3>Keyword gaps</h3>
         <div id="missing" class="ticks"></div>
       </div>
       <div id="preview-wrap" hidden>
         <div class="row">
           <h3>Tailored preview</h3>
+          <button type="button" id="copy">Copy</button>
           <button type="button" id="pdf">Download PDF</button>
           <button type="button" id="txt">Download .txt</button>
         </div>
+        <div id="tailor-notes"></div>
         <div id="preview" class="preview"></div>
       </div>
+    </section>
+
+    <section id="jobs" class="view" hidden>
+      <p class="muted">New SDR, BDR, Customer Success, and Associate TAM roles from free public boards. Checking runs only while Chrome is open.</p>
+      <div class="row">
+        <button type="button" class="primary" id="open-jobs">Open jobs dashboard</button>
+        <button type="button" id="check-jobs">Check now</button>
+      </div>
+      <p id="jobs-status" class="status"></p>
     </section>
 
     <section id="fill" class="view" hidden>

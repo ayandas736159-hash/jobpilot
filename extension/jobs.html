@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot jobs</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="jobs.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <strong>JobPilot jobs</strong>
+        <small>Checks run only while Chrome is open.</small>
+      </div>
+    </div>
+    <button type="button" id="theme">Theme</button>
+  </header>
+  <main class="jobs-page">
+    <div class="row">
+      <button type="button" class="primary" id="check">Check now</button>
+      <span id="meta" class="muted"></span>
+    </div>
+    <p id="error" class="warn"></p>
+    <details>
+      <summary>Filters and company boards</summary>
+      <label for="titles">Title keywords, one per line</label>
+      <textarea id="titles"></textarea>
+      <label class="check"><input id="remote" type="checkbox"> Remote only</label>
+      <label for="interval">Check every (minutes)</label>
+      <input id="interval" type="number" min="15" max="180" value="30">
+      <label for="boards">Company boards, one per line. Example: lever:sprinto</label>
+      <textarea id="boards" placeholder="greenhouse:airbnb&#10;lever:spotify&#10;ashby:notion"></textarea>
+      <button type="button" id="save">Save filters</button>
+    </details>
+    <div id="list"></div>
+  </main>
+  <script type="module" src="jobs.js"></script>
+</body>
+</html>

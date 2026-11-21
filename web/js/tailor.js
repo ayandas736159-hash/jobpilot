@@ -1,5 +1,6 @@
 import { DEFAULT_RESUME, SAMPLE_JD, analyzeResume, renderResumeHtml, resumeToText, tailorResume, parseResume } from "./lib/ats.js";
 import { groqAnswer } from "./lib/groq.js";
+import { tailorWithGroq } from "./lib/tailor-ai.js";
 import { MODELS } from "./lib/models.js";
 import { extractPdfText } from "./lib/pdf-text.js";
 import { textToPdfBytes } from "./lib/pdf-write.js";
@@ -100,8 +101,31 @@ function runTailor() {
   $("status").textContent = "Reordered your existing bullets and skills. No new jobs or numbers were added.";
   rememberResume();
 }
-$("tailor").addEventListener("click", runTailor);
-$("apply-ticks").addEventListener("click", runTailor);
+$("ai-tailor").addEventListener("click", async () => {
+  const apiKey = $("key").value.trim();
+  localStorage.setItem("jobpilot.groqKey", apiKey);
+  if (!apiKey) {
+    $("status").textContent = "Paste your Groq key in the answer section below. Tailoring uses the cheaper model.";
+    return;
+  }
+  if (!$("resume").value.trim() || !$("jd").value.trim()) {
+    $("status").textContent = "Add a resume and a job description.";
+    return;
+  }
+  profile.resumeText = $("resume").value;
+  $("status").textContent = "Tailoring with GPT-OSS 20B…";
+  try {
+    const result = await tailorWithGroq({ apiKey, profile, jd: $("jd").value });
+    lastModel = result.model;
+    $("preview").innerHTML = renderResumeHtml(lastModel);
+    const changes = (result.changes || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    const gaps = (result.gaps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    $("tailor-notes").innerHTML = `${changes ? `<h2>What changed</h2><ul>${changes}</ul>` : ""}${gaps ? `<h2>Gaps left off the resume</h2><ul>${gaps}</ul>` : ""}`;
+    $("status").textContent = "Tailored from your real experience. Nothing new was invented.";
+  } catch (error) {
+    $("status").textContent = error.message;
+  }
+});
 
 function download(filename, data, type) {
   const blob = new Blob([data], { type });
