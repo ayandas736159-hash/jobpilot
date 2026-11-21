@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "JobPilot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tailor your resume and review application answers. JobPilot never clicks Submit.",
-  "permissions": ["storage", "sidePanel"],
-  "host_permissions": ["https://api.groq.com/*"],
+  "permissions": ["storage", "sidePanel", "scripting", "activeTab"],
+  "host_permissions": ["https://api.groq.com/*", "http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -23,10 +23,17 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "js": ["inject.js"],
       "css": ["content.css"],
-      "type": "module",
+      "all_frames": true,
+      "match_about_blank": true,
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js", "lib/*.js"],
+      "matches": ["http://*/*", "https://*/*"]
     }
   ],
   "icons": {
