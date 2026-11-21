@@ -1,17 +1,40 @@
 export const DEFAULT_FILTERS = {
   titles: [
+    "sales development representative",
     "sdr",
-    "bdr",
-    "sales development",
     "business development representative",
-    "customer success",
-    "associate tam",
-    "technical account manager"
+    "bdr",
+    "customer success associate",
+    "associate technical account manager",
+    "technical account manager",
+    "implementation specialist",
+    "onboarding specialist",
+    "growth associate",
+    "customer success"
   ],
-  excludeLevel: ["senior", "staff", "principal", "director", "vp ", "head of"],
   remoteOnly: true,
-  regions: ["india", "apac", "asia", "worldwide", "anywhere", "global", "remote"]
+  showLocked: false
 };
+
+const LOCKED = /us only|u\.s\. only|usa only|united states only|uk only|united kingdom only|eu only|europe only|european union only|canada only|north america only|must be located|must reside|must live|only candidates in|only applicants|authorized to work in the (us|u\.s\.|uk|eu)|pacific time|eastern time only|uk time ?zone|\bpst\b|\best\b|\bcst\b|\bmst\b/;
+
+export function isRegionLocked(job) {
+  const loc = `${job.location || ""} ${job.title || ""}`.toLowerCase();
+  const desc = String(job.description || "").toLowerCase().slice(0, 500);
+  if (/worldwide|anywhere|global|apac|\bindia\b|\basia\b/.test(loc) && !LOCKED.test(loc)) return false;
+  if (LOCKED.test(loc) || LOCKED.test(desc)) return true;
+  if (/\b(uk|u\.k\.|united kingdom|usa|u\.s\.|united states|eu|europe|canada)\b/.test(loc) && !/worldwide|anywhere|global|india|apac|asia/.test(loc)) return true;
+  return false;
+}
+
+export function isSenior(job) {
+  const title = String(job.title || "").toLowerCase();
+  const blurb = `${title} ${String(job.description || "").slice(0, 280)}`.toLowerCase();
+  if (/\b(senior|sr\.|staff|principal|director|vice president|\bvp\b|head of)\b/.test(title)) return true;
+  if (/\b([5-9]|1\d)\+?\s*years\b/.test(blurb)) return true;
+  if (/\bmanager\b/.test(title) && !/\b(associate|junior|entry|technical account)\b/.test(title)) return true;
+  return false;
+}
 
 export function stripHtml(value) {
   return String(value || "")
@@ -31,24 +54,15 @@ export function parseBoards(text) {
   }).filter(Boolean);
 }
 
-function regionOk(job) {
-  const loc = `${job.location || ""}`.toLowerCase();
-  if (!loc || /worldwide|anywhere|global|remote|india|apac|asia/.test(loc)) return true;
-  if (/\b(united states|usa|u\.s\. only|uk only|europe only|canada only|north america only)\b/.test(loc)) return false;
-  return true;
-}
-
 export function matchJob(job, filters = DEFAULT_FILTERS) {
   const title = String(job.title || "");
   const titleL = title.toLowerCase();
   const titles = filters.titles?.length ? filters.titles : DEFAULT_FILTERS.titles;
   if (!titles.some((term) => titleL.includes(String(term).toLowerCase()))) return false;
-  const excluded = (filters.excludeLevel || DEFAULT_FILTERS.excludeLevel).some((term) => titleL.includes(term));
-  const junior = /\b(associate|junior|entry|graduate|sdr|bdr)\b/i.test(title);
-  if (excluded && !junior) return false;
+  if (isSenior(job)) return false;
   const remote = job.remote || /remote|worldwide|anywhere|global/i.test(`${job.location || ""} ${job.description || ""}`);
   if (filters.remoteOnly !== false && !remote) return false;
-  if (!regionOk(job)) return false;
+  if (!filters.showLocked && isRegionLocked(job)) return false;
   return true;
 }
 
@@ -83,13 +97,21 @@ export function jobsToNotify(fresh, { smartOn, fallback, threshold = 60 }) {
 }
 
 export function profileBrief(profile) {
+  const resume = String(profile?.resumeText || "");
+  const storyBits = (profile?.stories || []).map((story) => {
+    const facts = Array.isArray(story.facts) ? story.facts.join(" ") : String(story.facts || "");
+    return `${story.role || ""} ${facts}`.trim();
+  }).filter(Boolean);
+  const blob = `${storyBits.join("\n")}\n${resume}`;
+  const windows = [/solulab/i, /760/, /1,?370/, /dripify/i, /foundertruth/i, /snov/i].map((pattern) => {
+    const match = blob.match(pattern);
+    if (!match || match.index == null) return "";
+    return blob.slice(Math.max(0, match.index - 60), match.index + 160);
+  });
+  const evidence = [...windows, ...storyBits].join(" ").replace(/\s+/g, " ").trim().slice(0, 700);
   const name = profile?.name || "Padmanava Das";
-  const location = profile?.location || "Cooch Behar, India";
-  const stories = (profile?.stories || []).slice(0, 3).map((story) => {
-    const fact = Array.isArray(story.facts) ? story.facts[0] : "";
-    return `${story.role}: ${String(fact || "").slice(0, 120)}`;
-  }).filter(Boolean).join(" | ");
-  return `${name}, ${location}. B.Tech CSE, graduating 2026, CGPA 7.54/10. Seeking remote SDR/BDR, Customer Success, or Associate TAM. ${stories}`.slice(0, 900);
+  const location = profile?.location || "India";
+  return `${name}, based in ${location}. Fresher to about 1 year. That outbound work is real experience and a strong fit for entry SDR/BDR, not "no experience". B.Tech CSE 2026, CGPA 7.54/10. Needs remote roles open to India, APAC, Asia, or worldwide. ${evidence}`.slice(0, 1200);
 }
 
 export function smartMatchMessages(brief, jobs) {
@@ -103,7 +125,7 @@ export function smartMatchMessages(brief, jobs) {
   return [
     {
       role: "system",
-      content: "Score each job from 0 to 100 for this candidate. Return JSON only: {\"jobs\":[{\"id\":\"\",\"score\":0,\"reason\":\"one short line\"}]}. Use only the candidate facts. A low score is correct when the role is a weak fit."
+      content: "Score each job from 0 to 100. JSON only: {\"jobs\":[{\"id\":\"\",\"score\":0,\"reason\":\"one short line\"}]}. Copy each id exactly. Scores must differ. Entry remote SDR/BDR/CS/TAM open to India or worldwide is 70-90 when outbound experience overlaps. US-only, UK-only, EU-only, or senior/5+ years roles are under 30. Never say he has no experience."
     },
     { role: "user", content: `CANDIDATE:\n${brief}\nJOBS:\n${lines}` }
   ];
@@ -116,18 +138,24 @@ export function parseFitScores(text, ids) {
   if (start < 0 || end <= start) throw new Error("The model did not return JSON.");
   const data = JSON.parse(cleaned.slice(start, end + 1));
   const allowed = new Set(ids || []);
-  return (data.jobs || []).map((item) => ({
-    id: String(item.id || ""),
-    score: Math.max(0, Math.min(100, Math.round(Number(item.score)))),
-    reason: String(item.reason || "").replace(/\s+/g, " ").trim().slice(0, 180)
-  })).filter((item) => allowed.has(item.id) && Number.isFinite(item.score));
+  return (data.jobs || []).map((item) => {
+    const score = Number(item.score);
+    if (!Number.isFinite(score)) return null;
+    return {
+      id: String(item.id || ""),
+      score: Math.max(0, Math.min(100, Math.round(score))),
+      reason: String(item.reason || "").replace(/\s+/g, " ").trim().slice(0, 180)
+    };
+  }).filter((item) => item && allowed.has(item.id));
 }
 
 export function mergeJobs(existing, incoming, now = Date.now()) {
   const map = new Map((existing || []).map((job) => [job.id, job]));
+  const seenUrls = new Set((existing || []).map((job) => job.url));
   const fresh = [];
   (incoming || []).forEach((job) => {
-    if (!job?.id || !job.url || map.has(job.id)) return;
+    if (!job?.id || !job.url || map.has(job.id) || seenUrls.has(job.url)) return;
+    seenUrls.add(job.url);
     const row = { ...job, status: "new", firstSeen: now };
     map.set(job.id, row);
     fresh.push(row);
@@ -254,6 +282,34 @@ export function normalizeAshby(data, slug) {
     source: "Ashby",
     postedAt: asTime(job.publishedAt || job.publishedDate),
     description: job.descriptionPlain || job.descriptionHtml
+  })).filter((job) => job.url && job.title);
+}
+
+export function normalizeJobicy(data) {
+  return (data?.jobs || []).map((job) => row({
+    id: `jobicy:${job.id || job.url}`,
+    url: job.url,
+    title: job.jobTitle,
+    company: job.companyName,
+    location: job.jobGeo,
+    remote: true,
+    source: "Jobicy",
+    postedAt: asTime(job.pubDate),
+    description: job.jobExcerpt || job.jobDescription
+  })).filter((job) => job.url && job.title);
+}
+
+export function normalizeNomads(data) {
+  return (Array.isArray(data) ? data : []).map((job) => row({
+    id: `nomads:${job.url}`,
+    url: job.url,
+    title: job.title,
+    company: job.company_name,
+    location: job.location || job.category_name,
+    remote: true,
+    source: "Working Nomads",
+    postedAt: asTime(job.pub_date),
+    description: job.description
   })).filter((job) => job.url && job.title);
 }
 

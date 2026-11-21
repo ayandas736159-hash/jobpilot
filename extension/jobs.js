@@ -1,4 +1,4 @@
-import { DEFAULT_FILTERS, parseBoards } from "./lib/jobs.js";
+import { DEFAULT_FILTERS, isRegionLocked, isSenior, matchJob, parseBoards } from "./lib/jobs.js";
 
 const STORE = "jobpilot.jobs";
 const $ = (id) => document.getElementById(id);
@@ -24,24 +24,45 @@ function escapeHtml(value) {
 }
 
 async function render() {
-  const state = await load();
-  const jobs = state.jobs || [];
+  let state = await load();
+  if (state.filtersVersion !== 2) {
+    state = {
+      ...state,
+      filters: { ...DEFAULT_FILTERS, ...(state.filters || {}), titles: DEFAULT_FILTERS.titles },
+      showLocked: false,
+      scores: {},
+      scoreVersion: 2,
+      filtersVersion: 2
+    };
+    await save(state);
+  }
   const filters = state.filters || DEFAULT_FILTERS;
+  const allJobs = state.jobs || [];
+  const listed = allJobs.filter((job) => {
+    if (job.status === "dismissed" || job.status === "applied") return true;
+    if (isSenior(job)) return false;
+    if (!state.showLocked && isRegionLocked(job)) return false;
+    return matchJob(job, { ...DEFAULT_FILTERS, ...filters, showLocked: true });
+  });
   $("titles").value = (filters.titles || DEFAULT_FILTERS.titles).join("\n");
   $("remote").checked = filters.remoteOnly !== false;
+  $("show-locked").checked = !!state.showLocked;
   $("smart").checked = state.smartMatch !== false;
   $("threshold").value = state.smartThreshold ?? 60;
   $("limit").value = state.smartLimit || 25;
   $("interval").value = state.intervalMinutes || 30;
   $("boards").value = (state.boards || []).map((board) => `${board.kind}:${board.slug}`).join("\n");
   const checked = state.lastChecked ? new Date(state.lastChecked).toLocaleString() : "not yet";
-  const fresh = jobs.filter((job) => job.status === "new").length;
-  const tokens = state.lastSmartTokens ? ` · ${state.lastSmartTokens} tokens this check` : "";
-  $("meta").textContent = `${fresh} new · ${jobs.length} saved · last checked ${checked}${tokens}`;
+  const fresh = listed.filter((job) => job.status === "new").length;
+  const tokens = Number.isFinite(state.lastSmartTokens) && state.lastChecked ? ` · ${state.lastSmartTokens} tokens this check` : "";
+  const added = Number.isFinite(state.lastAdded) ? `${state.lastAdded} new this check · ` : "";
+  $("meta").textContent = `${added}${fresh} still open · last checked ${checked}${tokens}. ${state.lastSummary || ""}`;
   $("error").textContent = state.lastError || "";
-  $("list").innerHTML = jobs.map((job) => `<article class="job ${escapeHtml(job.status)}" data-id="${escapeHtml(job.id)}">
+  $("sources").innerHTML = (state.lastSources || []).map((source) => `<li>${source.ok ? "ok" : "error"} · ${escapeHtml(source.name)} · ${source.fetched} fetched · ${source.matched} matched${source.error ? ` · ${escapeHtml(source.error)}` : ""}</li>`).join("")
+    || "<li>Not checked yet.</li>";
+  $("list").innerHTML = listed.map((job) => `<article class="job ${escapeHtml(job.status)}" data-id="${escapeHtml(job.id)}">
     <header>
-      <div><strong>${escapeHtml(job.title)}</strong><div class="muted">${escapeHtml(job.company)} · ${escapeHtml(job.location || "Remote")} · ${escapeHtml(job.source)}</div>${Number.isFinite(job.fit) ? `<div class="fit">${job.fit} fit · ${escapeHtml(job.reason || "")}</div>` : ""}</div>
+      <div><strong>${escapeHtml(job.title)}</strong><div class="muted">${escapeHtml(job.company)} · ${escapeHtml(job.location || "Remote")} · ${escapeHtml(job.source)}</div><div class="fit">${Number.isFinite(job.fit) ? `${job.fit} fit · ${escapeHtml(job.reason || "")}` : "not scored"}</div></div>
       <span class="when">${escapeHtml(when(job.postedAt || job.firstSeen))}</span>
     </header>
     <div class="row">
@@ -109,6 +130,7 @@ $("save").addEventListener("click", async () => {
     titles: $("titles").value.split(/\n+/).map((line) => line.trim()).filter(Boolean),
     remoteOnly: $("remote").checked
   };
+  state.showLocked = $("show-locked").checked;
   state.smartMatch = $("smart").checked;
   state.smartThreshold = Math.max(0, Math.min(100, Number($("threshold").value) || 60));
   state.smartLimit = Math.max(1, Math.min(25, Number($("limit").value) || 25));

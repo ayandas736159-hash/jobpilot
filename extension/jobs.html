@@ -6,6 +6,7 @@
   <title>JobPilot jobs</title>
   <link rel="stylesheet" href="sidepanel.css">
   <link rel="stylesheet" href="jobs.css">
+  <link rel="stylesheet" href="buddy.css">
 </head>
 <body>
   <header class="top">
@@ -29,6 +30,7 @@
       <label for="titles">Title keywords, one per line</label>
       <textarea id="titles"></textarea>
       <label class="check"><input id="remote" type="checkbox"> Remote only</label>
+      <label class="check"><input id="show-locked" type="checkbox"> Show region-locked jobs</label>
       <label class="check"><input id="smart" type="checkbox"> Smart match (one cheap Groq call for new jobs)</label>
       <label for="threshold">Notify at fit score</label>
       <input id="threshold" type="number" min="0" max="100" value="60">
@@ -39,9 +41,13 @@
       <label for="boards">Company boards, one per line. Example: lever:sprinto</label>
       <textarea id="boards" placeholder="greenhouse:airbnb&#10;lever:spotify&#10;ashby:notion"></textarea>
       <button type="button" id="save">Save filters</button>
+      <h3>Sources this check</h3>
+      <ul id="sources"></ul>
     </details>
     <div id="list"></div>
   </main>
+  <div id="buddy-root" class="buddy-dock"></div>
+  <script type="module" src="buddy.js"></script>
   <script type="module" src="jobs.js"></script>
 </body>
 </html>

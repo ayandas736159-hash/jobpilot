@@ -195,6 +195,7 @@ button:active, .btn:active { transform: translateY(2px); box-shadow: 1px 1px 0 v
 .tab[data-tab="fill"]::before { content: "✏️ "; }
 .tab[data-tab="profile"]::before { content: "🎒 "; }
 .tab[data-tab="settings"]::before { content: "🎨 "; }
+.tab[data-tab="buddy"]::before { content: "🐣 "; }
 #extract::before { content: "👀 "; }
 #sample-jd::before { content: "🌟 "; }
 #analyze::before { content: "⭐ "; }
