@@ -52,6 +52,77 @@ export function matchJob(job, filters = DEFAULT_FILTERS) {
   return true;
 }
 
+export function jobsNeedingScore(jobs, cache, limit = 25) {
+  const cap = Math.max(1, Number(limit) || 25);
+  return (jobs || [])
+    .filter((job) => job?.id && !cache?.[job.id])
+    .sort((a, b) => (b.postedAt || 0) - (a.postedAt || 0))
+    .slice(0, cap);
+}
+
+export function applyScoreCache(jobs, cache) {
+  return (jobs || []).map((job) => {
+    const hit = cache?.[job.id];
+    if (!hit) return job;
+    return { ...job, fit: hit.score, reason: hit.reason };
+  });
+}
+
+export function sortByFit(jobs) {
+  return [...(jobs || [])].sort((a, b) => {
+    const aScore = Number.isFinite(a.fit) ? a.fit : -1;
+    const bScore = Number.isFinite(b.fit) ? b.fit : -1;
+    if (bScore !== aScore) return bScore - aScore;
+    return (b.postedAt || 0) - (a.postedAt || 0);
+  });
+}
+
+export function jobsToNotify(fresh, { smartOn, fallback, threshold = 60 }) {
+  if (!smartOn || fallback) return fresh || [];
+  return (fresh || []).filter((job) => Number.isFinite(job.fit) && job.fit >= threshold);
+}
+
+export function profileBrief(profile) {
+  const name = profile?.name || "Padmanava Das";
+  const location = profile?.location || "Cooch Behar, India";
+  const stories = (profile?.stories || []).slice(0, 3).map((story) => {
+    const fact = Array.isArray(story.facts) ? story.facts[0] : "";
+    return `${story.role}: ${String(fact || "").slice(0, 120)}`;
+  }).filter(Boolean).join(" | ");
+  return `${name}, ${location}. B.Tech CSE, graduating 2026, CGPA 7.54/10. Seeking remote SDR/BDR, Customer Success, or Associate TAM. ${stories}`.slice(0, 900);
+}
+
+export function smartMatchMessages(brief, jobs) {
+  const lines = (jobs || []).map((job) => [
+    job.id,
+    job.title,
+    job.company,
+    job.location || "Remote",
+    String(job.description || "").replace(/\s+/g, " ").slice(0, 600)
+  ].join(" | ")).join("\n");
+  return [
+    {
+      role: "system",
+      content: "Score each job from 0 to 100 for this candidate. Return JSON only: {\"jobs\":[{\"id\":\"\",\"score\":0,\"reason\":\"one short line\"}]}. Use only the candidate facts. A low score is correct when the role is a weak fit."
+    },
+    { role: "user", content: `CANDIDATE:\n${brief}\nJOBS:\n${lines}` }
+  ];
+}
+
+export function parseFitScores(text, ids) {
+  const cleaned = String(text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("The model did not return JSON.");
+  const data = JSON.parse(cleaned.slice(start, end + 1));
+  const allowed = new Set(ids || []);
+  return (data.jobs || []).map((item) => ({
+    id: String(item.id || ""),
+    score: Math.max(0, Math.min(100, Math.round(Number(item.score)))),
+    reason: String(item.reason || "").replace(/\s+/g, " ").trim().slice(0, 180)
+  })).filter((item) => allowed.has(item.id) && Number.isFinite(item.score));
+}
+
 export function mergeJobs(existing, incoming, now = Date.now()) {
   const map = new Map((existing || []).map((job) => [job.id, job]));
   const fresh = [];
