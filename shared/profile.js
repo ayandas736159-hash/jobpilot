@@ -111,14 +111,32 @@ export function profileCorpus(profile) {
   ].filter(Boolean).join("\n");
 }
 
+function readEducation(resume) {
+  const edu = (String(resume || "").split(/\neducation\b/i)[1] || "").split(/\n[A-Z][A-Z &/]{3,}\s*\n/)[0];
+  const ranges = [...edu.matchAll(/(\d{4})\s*[\u2013\u2014\-]\s*(\d{4})/g)];
+  const summaryYear = String(resume || "").match(/graduate\s*\((\d{4})\)/i);
+  const graduationYear = ranges.length
+    ? Number(ranges[ranges.length - 1][2])
+    : summaryYear ? Number(summaryYear[1]) : null;
+  const cse = /computer science|\bcse\b/i.test(edu);
+  const btech = /b\.?\s*tech|bachelor/i.test(edu);
+  let degree = "";
+  if (btech && cse) degree = "B.Tech CSE";
+  else if (btech) degree = "Bachelor";
+  return { degree, graduationYear };
+}
+
 /** Numbers and education pulled from the resume text, not guessed. */
 export function readFacts(profile) {
   const resume = String(profile.resumeText || "");
   const corpus = profileCorpus(profile);
   const cgpaMatch = resume.match(/cgpa\s*[:\-]?\s*([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const education = readEducation(resume);
   return {
     cgpa: cgpaMatch ? Number(cgpaMatch[1]) : null,
     cgpaScale: cgpaMatch ? Number(cgpaMatch[2]) : null,
+    degree: education.degree,
+    graduationYear: education.graduationYear,
     hasInternship: /\bintern(ship)?\b|\btrainee\b/i.test(corpus),
     security: /\b(cybersecurity|cyber security|\bsoc\b|\bgrc\b|it audit|information security)\b/i.test(corpus),
     customerFacing: /\b(customer|sales|business development|\bb2b\b|outreach|growth hacker|retail)\b/i.test(corpus),

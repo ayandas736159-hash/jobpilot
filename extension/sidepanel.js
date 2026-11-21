@@ -503,7 +503,7 @@ $("write").addEventListener("click", async () => {
   for (const item of open) {
     const cacheKey = `ans:${hash([item.field.label, jd, activeModel(), limits.wordMin, limits.wordMax, profileCorpus(state.profile)].join("|"))}`;
     const saved = await cachedAnswer(cacheKey);
-    if (saved && !item.value) {
+    if (saved && saved.trim() && !item.value) {
       item.value = saved;
       item.review = assessAnswer(saved, { ...limits, corpus: `${profileCorpus(state.profile)}\n${jd}` });
       continue;
@@ -527,18 +527,27 @@ $("write").addEventListener("click", async () => {
         company: state.scan?.company || "",
         ...limits
       });
-      item.value = result.text;
+      if (!result.text || !result.text.trim()) {
+        throw new Error("Groq returned an empty answer. Press Write answers to retry.");
+      }
+      item.value = result.text.trim();
       item.include = true;
       state.tokens += result.tokens || estimate;
-      item.review = assessAnswer(result.text, { ...limits, corpus: `${profileCorpus(state.profile)}\n${jd}` });
-      await storageSet("local", { [cacheKey]: result.text });
+      item.review = assessAnswer(item.value, { ...limits, corpus: `${profileCorpus(state.profile)}\n${jd}` });
+      await storageSet("local", { [cacheKey]: item.value });
     } catch (error) {
+      item.review = null;
       setStatus("fill-status", error.message);
       renderProposals();
       return;
     }
   }
+  const missing = open.filter((item) => !String(item.value || "").trim());
   renderProposals();
+  if (missing.length) {
+    setStatus("fill-status", "Groq returned no text for an answer. Press Write answers to retry.");
+    return;
+  }
   setStatus("fill-status", "Answers are in the panel. Edit them, then fill the page. Nothing is submitted.");
 });
 

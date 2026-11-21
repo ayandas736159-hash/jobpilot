@@ -183,6 +183,114 @@ function looksLikeInternship(question) {
   return /completed an internship|have you.{0,40}intern|internship experience/.test(question.toLowerCase());
 }
 
+function looksLikeQualification(question) {
+  return /qualification|degree|field of study|what did you study/.test(question.toLowerCase());
+}
+
+function scoreQualification(label, facts) {
+  const text = label.toLowerCase();
+  const corpus = facts.corpus || "";
+  const isCse = /computer science|\bcse\b/i.test(corpus) || /cse/i.test(facts.degree || "");
+  const isBtech = /b\.?\s*tech|bachelor/i.test(corpus);
+  let score = 0;
+  if (/b\.?\s*tech|bachelor|b\.e\b/.test(text) && isBtech) score += 2;
+  if (/\bcse\b|computer|information technology|\bit\b|ai\/ml|artificial intelligence/.test(text) && isCse) score += 4;
+  if (/cyber/.test(text) && !facts.security) score -= 3;
+  if (/\bmba\b|m\.?\s*tech|commerce|arts|design/.test(text) && !/\bmba\b|m\.?\s*tech/i.test(corpus)) score -= 3;
+  if (/^other\b/.test(text.trim())) score -= 1;
+  return score;
+}
+
+function pickQualification(labels, facts) {
+  if (!facts.degree) {
+    return result(-1, labels, {
+      confidence: 0,
+      source: "none",
+      reason: "No degree is listed in the resume, so this stays blank."
+    });
+  }
+  let best = -1;
+  let bestScore = 0;
+  labels.forEach((label, index) => {
+    const score = scoreQualification(label, facts);
+    if (score > bestScore) {
+      best = index;
+      bestScore = score;
+    }
+  });
+  if (best < 0 || bestScore < 4) {
+    return result(-1, labels, {
+      confidence: 0,
+      source: "none",
+      reason: `Resume lists ${facts.degree}, and none of these options say that.`
+    });
+  }
+  const year = facts.graduationYear ? `, graduating ${facts.graduationYear}` : "";
+  return result(best, labels, {
+    confidence: 0.95,
+    source: "rule",
+    reason: `Resume lists ${facts.degree}${year}.`
+  });
+}
+
+function yearSpan(label) {
+  const text = label.toLowerCase().replace(/[–—]/g, "-");
+  const years = [...text.matchAll(/\b(20\d{2})\b/g)].map((match) => Number(match[1]));
+  if (!years.length) return null;
+  if (/or later|or after|and later/.test(text)) return { min: years[0], max: 9999 };
+  if (/or earlier|or before|and earlier/.test(text)) return { min: 0, max: years[0] };
+  if (years.length >= 2) return { min: Math.min(...years), max: Math.max(...years) };
+  return { min: years[0], max: years[0] };
+}
+
+function looksLikeGraduation(question) {
+  return /when do you graduate|when will you graduate|graduation year|year of graduation|graduating in/.test(question.toLowerCase());
+}
+
+function pickGraduation(labels, facts) {
+  if (!facts.graduationYear) {
+    return result(-1, labels, {
+      confidence: 0,
+      source: "none",
+      reason: "No graduation year is listed in the resume, so this stays blank."
+    });
+  }
+  const hits = [];
+  labels.forEach((label, index) => {
+    const span = yearSpan(label);
+    if (!span || facts.graduationYear < span.min || facts.graduationYear > span.max) return;
+    hits.push({ index, width: span.max - span.min });
+  });
+  if (!hits.length) {
+    return result(-1, labels, {
+      confidence: 0,
+      source: "none",
+      reason: `Resume lists graduation in ${facts.graduationYear}, and none of these options include that year.`
+    });
+  }
+  hits.sort((a, b) => a.width - b.width);
+  return result(hits[0].index, labels, {
+    confidence: 0.97,
+    source: "rule",
+    reason: `Education dates end in ${facts.graduationYear}.`
+  });
+}
+
+function looksLikeStart(question) {
+  return /how soon|when can you (start|join)|could you join|notice period/.test(question.toLowerCase());
+}
+
+function pickStart(labels, profile) {
+  if (!String(profile.noticePeriod || "").trim()) {
+    return result(-1, labels, {
+      confidence: 0,
+      source: "none",
+      reason: "Notice period is blank in the profile, so this stays unset."
+    });
+  }
+  return pickByOverlap(labels, profile);
+}
+
 /**
  * Pick one option from profile rules.
  * source "needs-model" means a short Groq call is justified.
@@ -194,6 +302,9 @@ export function chooseOption(question, options, profile) {
   if (looksLikeScale(question, labels)) return pickScale(labels, facts);
   if (looksLikeRange(question, labels)) return pickRange(labels, facts);
   if (looksLikeInternship(question)) return pickInternship(labels, facts);
+  if (looksLikeQualification(question)) return pickQualification(labels, facts);
+  if (looksLikeGraduation(question)) return pickGraduation(labels, facts);
+  if (looksLikeStart(question)) return pickStart(labels, profile || {});
   return pickByOverlap(labels, profile || {});
 }
 

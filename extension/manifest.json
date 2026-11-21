@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobPilot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Tailor your resume and review application answers. JobPilot never clicks Submit.",
   "permissions": ["storage", "sidePanel", "scripting", "activeTab"],
   "host_permissions": ["https://api.groq.com/*", "http://*/*", "https://*/*"],

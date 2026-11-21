@@ -147,12 +147,16 @@ function hasWord(hay, word) {
 
 export function rankStories(question, stories) {
   const q = String(question || "").toLowerCase();
-  const wantsIntern = /intern/.test(q);
+  const outsideIntern = /outside\s+(of\s+)?(academic|intern)/.test(q);
+  const wantsIntern = /intern/.test(q) && !outsideIntern;
   const wantsNumber = /number|outcome|metric|result|changed|impact/.test(q);
   const words = q.split(/[^a-z0-9+]+/).filter((word) => word.length > 3 && !STOP.has(word));
   const all = stories || [];
   const internPool = all.filter((story) => /intern|trainee|extern/i.test(story.role || ""));
-  const pool = wantsIntern && internPool.length ? internPool : all;
+  const nonInternPool = all.filter((story) => !/intern|trainee|extern/i.test(story.role || ""));
+  const pool = outsideIntern && nonInternPool.length
+    ? nonInternPool
+    : wantsIntern && internPool.length ? internPool : all;
   const rankedPool = pool
     .map((story) => {
       const hay = storyText(story).toLowerCase();
@@ -185,7 +189,9 @@ export function buildFactsBlock(profile, question) {
     profile.workAuthorization ? `Work authorization: ${profile.workAuthorization}` : "",
     profile.noticePeriod ? `Notice period: ${profile.noticePeriod}` : "",
     profile.expectedSalary ? `Expected salary: ${profile.expectedSalary}` : "",
-    facts.cgpa != null ? `Education fact: CGPA ${facts.cgpa}/${facts.cgpaScale}` : "",
+    facts.degree || facts.graduationYear || facts.cgpa != null
+      ? `Education: ${[facts.degree, facts.graduationYear ? `graduating ${facts.graduationYear}` : "", facts.cgpa != null ? `CGPA ${facts.cgpa}/${facts.cgpaScale}` : ""].filter(Boolean).join(", ")}`
+      : "",
     "",
     "PRIMARY STORY:"
   ];
@@ -193,21 +199,12 @@ export function buildFactsBlock(profile, question) {
     lines.push(`Role: ${primary.role}`);
     factLines(primary).forEach((line) => lines.push(`- ${line}`));
   } else {
-    lines.push("No experience stories saved. Use only the resume excerpt.");
+    lines.push("No experience stories saved.");
   }
-  lines.push("", "ALTERNATE STORY (only if the question fits it better than the primary):");
-  if (alternate) {
-    lines.push(`Role: ${alternate.role}`);
-    factLines(alternate).forEach((line) => lines.push(`- ${line}`));
-  } else {
-    lines.push("none");
-  }
-  lines.push("", "OTHER ROLES (names only — do not invent details):");
-  if (rest.length) rest.forEach((story) => lines.push(`- ${story.role}`));
-  else lines.push("none");
-  const excerpt = String(profile.resumeText || "").replace(/\s+/g, " ").trim().slice(0, 700);
-  if (excerpt) {
-    lines.push("", "RESUME EXCERPT (supporting context, still not a license to invent):", excerpt);
+  const others = [alternate, ...rest].filter(Boolean);
+  if (others.length) {
+    lines.push("", "OTHER ROLES (names only — do not invent details):");
+    others.forEach((story) => lines.push(`- ${story.role}`));
   }
   return lines.filter((line) => line !== undefined).join("\n");
 }
@@ -226,7 +223,7 @@ export function buildUserPrompt({
   wordMax = DEFAULT_WORD_MAX
 }) {
   const shape = detectQuestionShape(question);
-  const job = String(jd || "").replace(/\s+/g, " ").trim().slice(0, 1200);
+  const job = String(jd || "").replace(/\s+/g, " ").trim().slice(0, 500);
   return [
     "QUESTION:",
     String(question || "").trim(),
@@ -250,7 +247,7 @@ export function buildUserPrompt({
 
 export function buildAnswerMessages(options) {
   const messages = [{ role: "system", content: SYSTEM_PROMPT }];
-  const shots = options.examples === false ? [] : FEW_SHOTS;
+  const shots = options.examples ? FEW_SHOTS.slice(0, 1) : [];
   shots.forEach((shot) => {
     messages.push({ role: "user", content: shot.user });
     messages.push({ role: "assistant", content: shot.assistant });

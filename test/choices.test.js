@@ -43,12 +43,38 @@ test("a start-date question stays blank when notice period is empty", () => {
   assert.equal(choice.index, -1);
 });
 
+test("degree and graduation year are chosen from the resume without a model", () => {
+  const qualification = chooseOption("Which qualification best describes you?", [
+    "B.Tech in Cybersecurity",
+    "B.Tech in CSE, IT, or adjacent fields like AI/ML",
+    "MBA in ITBM",
+    "MBA",
+    "Other"
+  ], profile);
+  assert.equal(qualification.label, "B.Tech in CSE, IT, or adjacent fields like AI/ML");
+  assert.equal(qualification.source, "rule");
+  const graduation = chooseOption("When do you graduate?", ["2026", "2025", "2024 or earlier", "2027 or later"], profile);
+  assert.equal(graduation.label, "2026");
+  assert.equal(graduation.source, "rule");
+  assert.match(graduation.reason, /2026/);
+});
+
 test("notice period text selects the matching option", () => {
   const choice = chooseOption("When can you start?", ["Immediately", "In 2 weeks", "In 30 days"], {
     ...profile,
     noticePeriod: "Immediately"
   });
   assert.equal(choice.label, "Immediately");
+  assert.equal(choice.source, "rule");
+});
+
+test("Sprinto CGPA buckets put 7.54 in Below 8.0", () => {
+  const choice = chooseOption(
+    "If your college reports CGPA on a 10-point scale, where does your current or final score fall?",
+    ["10.0–0.0", "8.5 to below 9.0", "8.0 to below 8.5", "Below 8.0"],
+    profile
+  );
+  assert.equal(choice.label, "Below 8.0");
   assert.equal(choice.source, "rule");
 });
 

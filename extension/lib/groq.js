@@ -4,6 +4,54 @@ import { estimateMessages } from "./tokens.js";
 
 const ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
+export function messageText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.map((part) => {
+      if (typeof part === "string") return part;
+      if (!part || part.type === "reasoning" || part.type === "thinking") return "";
+      if (typeof part.text === "string") return part.text;
+      return "";
+    }).filter(Boolean).join("\n");
+  }
+  return "";
+}
+
+export function visibleAnswer(content) {
+  return messageText(content)
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<\/?think>/gi, "")
+    .trim();
+}
+
+/** Read the answer field. Reasoning is not the answer. Empty content is an error. */
+export function answerTextFromCompletion(data) {
+  const choice = data?.choices?.[0] || {};
+  const text = visibleAnswer(choice.message?.content);
+  if (text) return text;
+  const finish = choice.finish_reason || "";
+  if (finish === "length") {
+    throw new Error("Groq returned no answer. The token limit was used up before the reply. Press Write answers to retry.");
+  }
+  throw new Error("Groq returned an empty answer. Press Write answers to retry.");
+}
+
+export function chatRequestBody({ model, messages, maxTokens }) {
+  const limit = Math.max(64, Number(maxTokens) || 64);
+  const body = {
+    model,
+    temperature: 0.4,
+    max_completion_tokens: limit,
+    max_tokens: limit,
+    messages
+  };
+  if (/gpt-oss/i.test(model || "")) {
+    body.reasoning_effort = "low";
+    body.reasoning_format = "hidden";
+  }
+  return body;
+}
+
 export async function groqChat({ apiKey, model, messages, maxTokens }) {
   const response = await fetch(ENDPOINT, {
     method: "POST",
@@ -11,12 +59,7 @@ export async function groqChat({ apiKey, model, messages, maxTokens }) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.4,
-      max_tokens: maxTokens,
-      messages
-    })
+    body: JSON.stringify(chatRequestBody({ model, messages, maxTokens }))
   });
   const raw = await response.text();
   let data = null;
@@ -25,7 +68,7 @@ export async function groqChat({ apiKey, model, messages, maxTokens }) {
     const message = data?.error?.message || raw.slice(0, 280) || response.statusText;
     throw new Error(`Groq ${response.status}: ${message}`);
   }
-  const text = data?.choices?.[0]?.message?.content?.trim() || "";
+  const text = answerTextFromCompletion(data);
   const usage = data?.usage || {};
   return {
     text,
@@ -38,7 +81,7 @@ export async function groqChat({ apiKey, model, messages, maxTokens }) {
 
 export async function groqAnswer({ apiKey, model, profile, question, jd, company, wordMin, wordMax }) {
   const messages = buildAnswerMessages({ question, profile, jd, company, wordMin, wordMax });
-  const maxTokens = Math.min(700, Math.round(wordMax * 2) + 40);
+  const maxTokens = Math.max(900, Math.round((wordMax || 150) * 3));
   return groqChat({ apiKey, model, messages, maxTokens });
 }
 
@@ -48,7 +91,7 @@ export async function groqChoice({ apiKey, question, options, profile }) {
     apiKey,
     model: CHOICE_MODEL,
     messages,
-    maxTokens: 40
+    maxTokens: 200
   });
   const text = result.text.replace(/^["']|["']$/g, "").trim();
   if (!text || /^none$/i.test(text)) return { ...result, index: -1, text: "" };
