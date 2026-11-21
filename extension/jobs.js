@@ -29,15 +29,19 @@ async function render() {
   const filters = state.filters || DEFAULT_FILTERS;
   $("titles").value = (filters.titles || DEFAULT_FILTERS.titles).join("\n");
   $("remote").checked = filters.remoteOnly !== false;
+  $("smart").checked = state.smartMatch !== false;
+  $("threshold").value = state.smartThreshold ?? 60;
+  $("limit").value = state.smartLimit || 25;
   $("interval").value = state.intervalMinutes || 30;
   $("boards").value = (state.boards || []).map((board) => `${board.kind}:${board.slug}`).join("\n");
   const checked = state.lastChecked ? new Date(state.lastChecked).toLocaleString() : "not yet";
   const fresh = jobs.filter((job) => job.status === "new").length;
-  $("meta").textContent = `${fresh} new · ${jobs.length} saved · last checked ${checked}`;
+  const tokens = state.lastSmartTokens ? ` · ${state.lastSmartTokens} tokens this check` : "";
+  $("meta").textContent = `${fresh} new · ${jobs.length} saved · last checked ${checked}${tokens}`;
   $("error").textContent = state.lastError || "";
   $("list").innerHTML = jobs.map((job) => `<article class="job ${escapeHtml(job.status)}" data-id="${escapeHtml(job.id)}">
     <header>
-      <div><strong>${escapeHtml(job.title)}</strong><div class="muted">${escapeHtml(job.company)} · ${escapeHtml(job.location || "Remote")} · ${escapeHtml(job.source)}</div></div>
+      <div><strong>${escapeHtml(job.title)}</strong><div class="muted">${escapeHtml(job.company)} · ${escapeHtml(job.location || "Remote")} · ${escapeHtml(job.source)}</div>${Number.isFinite(job.fit) ? `<div class="fit">${job.fit} fit · ${escapeHtml(job.reason || "")}</div>` : ""}</div>
       <span class="when">${escapeHtml(when(job.postedAt || job.firstSeen))}</span>
     </header>
     <div class="row">
@@ -105,6 +109,9 @@ $("save").addEventListener("click", async () => {
     titles: $("titles").value.split(/\n+/).map((line) => line.trim()).filter(Boolean),
     remoteOnly: $("remote").checked
   };
+  state.smartMatch = $("smart").checked;
+  state.smartThreshold = Math.max(0, Math.min(100, Number($("threshold").value) || 60));
+  state.smartLimit = Math.max(1, Math.min(25, Number($("limit").value) || 25));
   state.boards = parseBoards($("boards").value);
   state.intervalMinutes = minutes;
   await save(state);

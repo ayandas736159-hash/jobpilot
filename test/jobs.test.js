@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyScoreCache,
+  jobsNeedingScore,
+  jobsToNotify,
   matchJob,
   mergeJobs,
   normalizeGreenhouse,
   normalizeLever,
   normalizeRemotive,
-  parseBoards
+  parseBoards,
+  parseFitScores,
+  sortByFit
 } from "../shared/jobs.js";
 
 test("target titles match and senior or country-locked roles do not", () => {
@@ -27,6 +32,22 @@ test("new jobs are deduped and sorted newest first", () => {
   assert.equal(second.fresh.length, 1);
   assert.equal(second.jobs[0].id, "b");
   assert.equal(second.jobs.filter((job) => job.id === "a").length, 1);
+});
+
+test("smart match scores each new job once and notifies only high fits", () => {
+  const jobs = [
+    { id: "a", postedAt: 1 },
+    { id: "b", postedAt: 3 },
+    { id: "c", postedAt: 2 }
+  ];
+  const cache = { a: { score: 80, reason: "SDR outreach" } };
+  assert.deepEqual(jobsNeedingScore(jobs, cache, 1).map((job) => job.id), ["b"]);
+  const scored = sortByFit(applyScoreCache(jobs, { ...cache, b: { score: 40, reason: "Weak" } }));
+  assert.deepEqual(scored.map((job) => job.id), ["a", "b", "c"]);
+  const parsed = parseFitScores("```json\n{\"jobs\":[{\"id\":\"b\",\"score\":140,\"reason\":\"Strong SDR fit\"},{\"id\":\"nope\",\"score\":10,\"reason\":\"x\"}]}\n```", ["b"]);
+  assert.deepEqual(parsed, [{ id: "b", score: 100, reason: "Strong SDR fit" }]);
+  assert.equal(jobsToNotify([{ id: "b", fit: 70 }, { id: "c", fit: 40 }], { smartOn: true, fallback: false, threshold: 60 }).length, 1);
+  assert.equal(jobsToNotify([{ id: "c", fit: 40 }], { smartOn: true, fallback: true, threshold: 60 }).length, 1);
 });
 
 test("public board payloads become jobs", () => {
