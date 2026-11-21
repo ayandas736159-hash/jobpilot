@@ -1,5 +1,6 @@
 import {
   buddyPageMatchMessages,
+  closestPageJobs,
   filterPageJobs,
   mergePageJobs,
   pageMatchBrief,
@@ -9,6 +10,7 @@ import { isWebPage, pickTab, connectFailureMessage } from "./lib/connect.js";
 import { groqChat } from "./lib/groq.js";
 import { renderMarkdown } from "./lib/markdown.js";
 import { MODELS } from "./lib/models.js";
+import { wantsCrmSave } from "./lib/crm.js";
 import { buildBuddySystemPrompt, wantsBuddyPageScan } from "./lib/prompts.js";
 
 const root = document.getElementById("buddy-root");
@@ -42,6 +44,7 @@ function startBuddy(root) {
       <button type="button" id="buddy-scan">Scan this careers page</button>
       <button type="button" id="buddy-unhighlight">Clear highlights</button>
     </div>
+    <p id="buddy-status" class="muted"></p>
     <div class="buddy-messages" id="buddy-log"></div>
     <div class="buddy-compose">
       <div class="buddy-row">
@@ -60,7 +63,9 @@ function startBuddy(root) {
   const input = root.querySelector("#buddy-input");
   const muteBtn = root.querySelector("#buddy-mute");
   const modelSel = root.querySelector("#buddy-model");
+  const statusEl = root.querySelector("#buddy-status");
   let turns = [];
+  let lastAsk = "";
   let muted = false;
   let modelTier = "quality";
   let audioReady = false;
@@ -75,7 +80,8 @@ function startBuddy(root) {
     log.innerHTML = turns.map((turn) => {
       const body = turn.role === "assistant" ? renderMarkdown(turn.content) : `<p>${escapeText(turn.content)}</p>`;
       const label = turn.role === "user" ? "You" : "Buddy";
-      return `<article class="buddy-bubble ${turn.role === "user" ? "me" : "them"}"><span class="buddy-label">${label}</span><div class="buddy-md">${body}</div></article>`;
+      const retry = turn.retry ? `<button type="button" data-retry="1">Retry</button>` : "";
+      return `<article class="buddy-bubble ${turn.role === "user" ? "me" : "them"}"><span class="buddy-label">${label}</span><div class="buddy-md">${body}</div>${retry}</article>`;
     }).join("");
     log.scrollTop = log.scrollHeight;
     muteBtn.textContent = muted ? "Sound off" : "Sound on";
@@ -186,25 +192,42 @@ function startBuddy(root) {
     }).filter(Boolean);
     return `**Best matches on this page:**\n\n${lines.join("\n")}\n\n**Next step:** Open the top link and use Autofill when you are ready.`;
   }
+  function setStatus(text) {
+    if (statusEl) statusEl.textContent = text || "";
+  }
+  function friendly(error) {
+    const msg = String(error?.message || error || "");
+    if (/is not defined|is not a function|Cannot read|Unexpected token|pageContext/i.test(msg)) {
+      return "Something went wrong on my side. Press Retry.";
+    }
+    return msg || "Something went wrong. Press Retry.";
+  }
   async function scanPage(userVisible = true) {
     unlock();
     mood("think");
     const data = await load();
     if (!data.settings?.apiKey) throw new Error("Add your Groq key in Settings first.");
     const { tab, filtered, all } = await listJobsOnPage();
-    if (!filtered.length) {
-      return "I found listings, but none matched your title and region filters. Turn on **Show region-locked jobs** on the Jobs dashboard if you want those.";
+    const pool = filtered.length ? filtered : closestPageJobs(all);
+    setStatus(`Found ${all.length} jobs, ${filtered.length} match your filters${pool.length && !filtered.length ? `, ${pool.length} close sales or success roles` : ""}.`);
+    if (!pool.length) {
+      const sample = all.slice(0, 5).map((job) => job.title).join("; ");
+      return `Found ${all.length} jobs, 0 match your filters. I didn't see sales or customer-success roles open to India. Sample titles: ${sample}`;
     }
+    const lead = filtered.length
+      ? `Found ${all.length} jobs, ${filtered.length} match your filters. Top picks:`
+      : `Found ${all.length} jobs, 0 match your exact titles. Closest sales or customer-success roles open to India:`;
     const result = await groqChat({
       apiKey: data.settings.apiKey,
       model: buddyModel(),
       maxTokens: 1200,
-      messages: buddyPageMatchMessages(pageMatchBrief(data.profile), filtered)
+      messages: buddyPageMatchMessages(pageMatchBrief(data.profile), pool.slice(0, 25))
     });
-    const matches = parseBuddyPageMatches(result.text, filtered.map((job) => job.idx));
+    const matches = parseBuddyPageMatches(result.text, pool.map((job) => job.idx));
     if (!matches.length) throw new Error("I could not score the listings. Try again.");
     await sendTab(tab.id, "BUDDY_HIGHLIGHT", { matches });
-    const reply = formatScanReply(matches, all);
+    const reply = `${lead}\n\n${formatScanReply(matches, all)}`;
+    setStatus(`Found ${all.length} jobs, ${filtered.length} match your filters, top picks ready.`);
     if (userVisible) {
       turns.push({ role: "user", content: "Scan this careers page" });
       turns.push({ role: "assistant", content: reply });
@@ -216,12 +239,13 @@ function startBuddy(root) {
     }
     return reply;
   }
-  async function ask(text) {
+  async function ask(text, opts = {}) {
     unlock();
     chirp(520);
     mood("nod");
     if (!text) return;
-    turns.push({ role: "user", content: text });
+    lastAsk = text;
+    if (!opts.retry) turns.push({ role: "user", content: text });
     turns = turns.slice(-10);
     paint();
     await saveBuddy();
@@ -230,6 +254,14 @@ function startBuddy(root) {
     if (!data.settings?.apiKey) {
       turns.push({ role: "assistant", content: "Add your Groq key in Settings first." });
       paint();
+      return;
+    }
+    if (wantsCrmSave(text)) {
+      document.dispatchEvent(new CustomEvent("jobpilot-crm-save"));
+      turns.push({ role: "assistant", content: "I opened the CRM tab with this page. Check the fields, then press Save job." });
+      turns = turns.slice(-10);
+      paint();
+      await saveBuddy();
       return;
     }
     if (wantsBuddyPageScan(text)) {
@@ -252,13 +284,12 @@ function startBuddy(root) {
     }
     try {
       const system = buildBuddySystemPrompt(data.profile);
-      const context = pageContext ? `\n\nPAGE CONTEXT:\n${pageContext}` : "";
       const result = await groqChat({
         apiKey: data.settings.apiKey,
         model: buddyModel(),
         maxTokens: 900,
         messages: [
-          { role: "system", content: system + context },
+          { role: "system", content: system },
           ...turns.slice(-10).map((turn) => ({ role: turn.role, content: turn.content }))
         ]
       });
@@ -268,7 +299,7 @@ function startBuddy(root) {
       turns.push({ role: "assistant", content: reply });
       if (/sure|yes|good idea|let's/i.test(reply)) mood("nod");
     } catch (error) {
-      turns.push({ role: "assistant", content: error.message || "I'm not sure. Try again." });
+      turns.push({ role: "assistant", content: friendly(error), retry: true });
     }
     turns = turns.slice(-10);
     paint();
@@ -278,7 +309,12 @@ function startBuddy(root) {
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
+    lastAsk = text;
     ask(text);
+  });
+  log.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-retry]") || !lastAsk) return;
+    ask(lastAsk, { retry: true });
   });
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") root.querySelector("#buddy-send").click();
@@ -334,13 +370,14 @@ function startBuddy(root) {
   function later() {
     if (popsLeft <= 0 || !panel) return;
     const wait = 120000 + Math.random() * 120000;
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       popsLeft -= 1;
       pop.hidden = false;
       pop.textContent = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
       chirp(760);
       later();
     }, wait);
+    timer.unref?.();
   }
   later();
 }

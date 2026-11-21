@@ -1,6 +1,7 @@
 import { applyBuddyHighlights, clearBuddyHighlights, extractBuddyListings } from "./lib/buddy-listings.js";
 import { applyPlan, clickNext, highlightSubmits } from "./lib/fill.js";
 import { scanDocument } from "./lib/fields.js";
+import { extractJobPosting } from "./lib/crm.js";
 import { extractJobDescription, guessCompany } from "./lib/jd.js";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -13,6 +14,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         jd: extractJobDescription(document),
         company: guessCompany(document, location.href)
       });
+      return;
+    }
+    if (message.type === "EXTRACT_POSTING") {
+      sendResponse({ ok: true, posting: extractJobPosting(document, location.href), text: (document.body?.innerText || "").slice(0, 2500) });
       return;
     }
     if (message.type === "EXTRACT_JD") {

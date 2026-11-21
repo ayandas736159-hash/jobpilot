@@ -3,6 +3,7 @@ import { MODELS } from "./lib/models.js";
 import {
   DEFAULT_FILTERS,
   applyScoreCache,
+  companyForBoard,
   jobsNeedingScore,
   jobsToNotify,
   matchJob,
@@ -11,19 +12,24 @@ import {
   normalizeAshby,
   normalizeGreenhouse,
   normalizeHimalayas,
-  normalizeLever,
   normalizeJobicy,
+  normalizeLever,
   normalizeNomads,
-  normalizeRemoteOk,
   normalizeRemotive,
-  normalizeRss,
+  normalizeSmartRecruiters,
+  normalizeWorkable,
   parseFitScores,
+  purgeRemovedSources,
+  withDefaultBoards,
   profileBrief,
   smartMatchMessages,
   sortByFit
 } from "./lib/jobs.js";
 
+import { CRM_KEY, dueFollowUps } from "./lib/crm.js";
+
 const ALARM = "jobpilot-jobs";
+const CRM_ALARM = "jobpilot-crm";
 const STORE = "jobpilot.jobs";
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -37,7 +43,9 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => 
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) poll(false);
+  if (alarm.name === CRM_ALARM) remindFollowUps();
 });
+chrome.alarms.create(CRM_ALARM, { periodInMinutes: 60, delayInMinutes: 1 });
 
 chrome.notifications.onClicked.addListener(async (id) => {
   const state = await loadState();
@@ -73,12 +81,46 @@ function ensureAlarm(minutes) {
 
 function loadState() {
   return new Promise((resolve) => {
-    chrome.storage.local.get([STORE], (data) => resolve(data[STORE] || { jobs: [], filters: DEFAULT_FILTERS, boards: [], intervalMinutes: 30 }));
+    chrome.storage.local.get([STORE], (data) => {
+      let state = data[STORE] || { jobs: [], filters: DEFAULT_FILTERS, boards: [], intervalMinutes: 30 };
+      const purged = purgeRemovedSources(state);
+      const changed = purged.jobs.length !== (state.jobs || []).length;
+      state = purged;
+      if (state.boardsVersion !== 1) {
+        state.boards = withDefaultBoards(state.boards || []);
+        state.boardsVersion = 1;
+      }
+      if (changed || state.boardsVersion === 1 && !(data[STORE] || {}).boardsVersion) {
+        chrome.storage.local.set({ [STORE]: state }, () => resolve(state));
+        return;
+      }
+      resolve(state);
+    });
   });
 }
 
 function saveState(state) {
   return new Promise((resolve) => chrome.storage.local.set({ [STORE]: state }, resolve));
+}
+
+function remindFollowUps() {
+  chrome.storage.local.get([CRM_KEY], (data) => {
+    const book = data[CRM_KEY] || { entries: [] };
+    const due = dueFollowUps(book.entries || []);
+    if (!due.length) return;
+    const entries = (book.entries || []).map((entry) => {
+      if (!due.some((item) => item.id === entry.id)) return entry;
+      chrome.notifications.create(`crm-${entry.id}`, {
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+        title: `Follow up: ${entry.company || "Job"}`,
+        message: `${entry.title || "Role"} · ${entry.stage}`,
+        priority: 1
+      });
+      return { ...entry, followUpNotified: entry.followUpOn };
+    });
+    chrome.storage.local.set({ [CRM_KEY]: { ...book, entries } });
+  });
 }
 
 function setBadge(jobs) {
@@ -99,34 +141,56 @@ async function collect(state) {
   const tasks = [
     ["Remotive sales", "https://remotive.com/api/remote-jobs?category=sales", (text) => normalizeRemotive(JSON.parse(text))],
     ["Remotive support", "https://remotive.com/api/remote-jobs?category=customer-support", (text) => normalizeRemotive(JSON.parse(text))],
-    ["RemoteOK", "https://remoteok.com/api", (text) => normalizeRemoteOk(JSON.parse(text))],
     ["Himalayas", "https://himalayas.app/jobs/api", (text) => normalizeHimalayas(JSON.parse(text))],
     ["Arbeitnow", "https://www.arbeitnow.com/api/job-board-api", (text) => normalizeArbeitnow(JSON.parse(text))],
     ["Jobicy", "https://jobicy.com/api/v2/remote-jobs?count=50&tag=sales", (text) => normalizeJobicy(JSON.parse(text))],
-    ["Working Nomads", "https://www.workingnomads.com/api/exposed_jobs/", (text) => normalizeNomads(JSON.parse(text))],
-    ["We Work Remotely", "https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss", (text) => normalizeRss(text, "We Work Remotely")]
+    ["Working Nomads", "https://www.workingnomads.com/api/exposed_jobs/", (text) => normalizeNomads(JSON.parse(text))]
   ];
-  (state.boards || []).forEach((board) => {
+  const boards = state.boards || [];
+  boards.forEach((board) => {
+    const company = board.company || companyForBoard(board.kind, board.slug);
+    const label = `${company} (${board.kind})`;
     if (board.kind === "greenhouse") {
-      tasks.push([`Greenhouse ${board.slug}`, `https://boards-api.greenhouse.io/v1/boards/${board.slug}/jobs`, (text) => normalizeGreenhouse(JSON.parse(text), board.slug)]);
+      tasks.push([label, `https://boards-api.greenhouse.io/v1/boards/${board.slug}/jobs?content=true`, (text) => normalizeGreenhouse(JSON.parse(text), board.slug, company)]);
     } else if (board.kind === "lever") {
-      tasks.push([`Lever ${board.slug}`, `https://api.lever.co/v0/postings/${board.slug}?mode=json`, (text) => normalizeLever(JSON.parse(text), board.slug)]);
+      tasks.push([label, `https://api.lever.co/v0/postings/${board.slug}?mode=json`, (text) => normalizeLever(JSON.parse(text), board.slug, company)]);
     } else if (board.kind === "ashby") {
-      tasks.push([`Ashby ${board.slug}`, `https://api.ashbyhq.com/posting-api/job-board/${board.slug}`, (text) => normalizeAshby(JSON.parse(text), board.slug)]);
+      tasks.push([label, `https://api.ashbyhq.com/posting-api/job-board/${board.slug}`, (text) => normalizeAshby(JSON.parse(text), board.slug, company)]);
+    } else if (board.kind === "smartrecruiters") {
+      tasks.push([label, board.slug, async () => normalizeSmartRecruiters(await fetchSmartRecruiters(board.slug), board.slug, company), true]);
+    } else if (board.kind === "workable") {
+      tasks.push([label, `https://apply.workable.com/api/v1/widget/accounts/${board.slug}?details=false`, (text) => normalizeWorkable(JSON.parse(text), board.slug, company)]);
     }
   });
-  await Promise.all(tasks.map(async ([name, url, parse]) => {
-    try {
-      const text = await fetchText(url);
-      const parsed = parse(text);
-      const matched = parsed.filter((job) => matchJob(job, state.filters || DEFAULT_FILTERS));
-      jobs.push(...matched);
-      sources.push({ name, ok: true, fetched: parsed.length, matched: matched.length, error: "" });
-    } catch (error) {
-      sources.push({ name, ok: false, fetched: 0, matched: 0, error: String(error.message || error).slice(0, 80) });
-    }
-  }));
+  await runTasks(tasks, state, jobs, sources);
   return { jobs, sources };
+}
+
+async function fetchSmartRecruiters(slug) {
+  const first = JSON.parse(await fetchText(`https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100`));
+  let content = first.content || [];
+  if ((first.totalFound || 0) > content.length) {
+    const second = JSON.parse(await fetchText(`https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100&offset=100`));
+    content = content.concat(second.content || []);
+  }
+  return { content };
+}
+
+async function runTasks(tasks, state, jobs, sources) {
+  const batchSize = 4;
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const slice = tasks.slice(i, i + batchSize);
+    await Promise.all(slice.map(async ([name, url, parse, raw]) => {
+      try {
+        const parsed = raw ? await parse() : parse(await fetchText(url));
+        const matched = parsed.filter((job) => matchJob(job, state.filters || DEFAULT_FILTERS));
+        jobs.push(...matched);
+        sources.push({ name, ok: true, fetched: parsed.length, matched: matched.length, error: "" });
+      } catch (error) {
+        sources.push({ name, ok: false, fetched: 0, matched: 0, error: String(error.message || error).slice(0, 80) });
+      }
+    }));
+  }
 }
 
 function storageGet(key) {

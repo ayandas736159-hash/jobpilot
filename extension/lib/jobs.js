@@ -48,7 +48,7 @@ export function stripHtml(value) {
 
 export function parseBoards(text) {
   return String(text || "").split(/\n+/).map((line) => {
-    const match = line.trim().match(/^(greenhouse|lever|ashby)\s*[:/]\s*([a-z0-9_-]+)\s*$/i);
+    const match = line.trim().match(/^(greenhouse|lever|ashby|smartrecruiters|workable)\s*[:/]\s*([A-Za-z0-9_-]+)\s*$/i);
     if (!match) return null;
     return { kind: match[1].toLowerCase(), slug: match[2] };
   }).filter(Boolean);
@@ -201,20 +201,6 @@ export function normalizeRemotive(data) {
   })).filter((job) => job.url && job.title);
 }
 
-export function normalizeRemoteOk(data) {
-  return (Array.isArray(data) ? data : []).filter((job) => job && job.position).map((job) => row({
-    id: `remoteok:${job.id || job.url}`,
-    url: job.url || job.apply_url,
-    title: job.position,
-    company: job.company,
-    location: job.location,
-    remote: true,
-    source: "RemoteOK",
-    postedAt: asTime(job.date || job.epoch),
-    description: job.description
-  })).filter((job) => job.url && job.title);
-}
-
 export function normalizeHimalayas(data) {
   return (data?.jobs || []).map((job) => row({
     id: `himalayas:${job.guid || job.applicationLink}`,
@@ -243,12 +229,12 @@ export function normalizeArbeitnow(data) {
   })).filter((job) => job.url && job.title);
 }
 
-export function normalizeGreenhouse(data, slug) {
+export function normalizeGreenhouse(data, slug, companyName) {
   return (data?.jobs || []).map((job) => row({
     id: `greenhouse:${slug}:${job.id}`,
     url: job.absolute_url,
     title: job.title,
-    company: slug,
+    company: companyName || slug,
     location: job.location?.name || "",
     remote: /remote/i.test(job.location?.name || job.title || ""),
     source: "Greenhouse",
@@ -257,12 +243,12 @@ export function normalizeGreenhouse(data, slug) {
   })).filter((job) => job.url && job.title);
 }
 
-export function normalizeLever(data, slug) {
+export function normalizeLever(data, slug, companyName) {
   return (Array.isArray(data) ? data : []).map((job) => row({
     id: `lever:${slug}:${job.id}`,
     url: job.hostedUrl,
     title: job.text,
-    company: slug,
+    company: companyName || slug,
     location: job.categories?.location || "",
     remote: /remote/i.test(`${job.categories?.location || ""} ${job.workplaceType || ""}`),
     source: "Lever",
@@ -271,12 +257,12 @@ export function normalizeLever(data, slug) {
   })).filter((job) => job.url && job.title);
 }
 
-export function normalizeAshby(data, slug) {
+export function normalizeAshby(data, slug, companyName) {
   return (data?.jobs || []).map((job) => row({
     id: `ashby:${slug}:${job.id}`,
     url: job.jobUrl || job.applyUrl,
     title: job.title,
-    company: slug,
+    company: companyName || slug,
     location: job.location || job.address?.postalAddress || "",
     remote: job.isRemote || /remote/i.test(`${job.location || ""} ${job.employmentType || ""}`),
     source: "Ashby",
@@ -313,24 +299,100 @@ export function normalizeNomads(data) {
   })).filter((job) => job.url && job.title);
 }
 
-export function normalizeRss(xml, source) {
-  const items = [...String(xml || "").matchAll(/<item>([\s\S]*?)<\/item>/gi)];
-  return items.map((item) => {
-    const block = item[1];
-    const title = (block.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/i) || block.match(/<title>(.*?)<\/title>/i) || [])[1] || "";
-    const link = (block.match(/<link>(.*?)<\/link>/i) || [])[1] || "";
-    const date = (block.match(/<pubDate>(.*?)<\/pubDate>/i) || [])[1] || "";
-    const company = (block.match(/<dc:creator><!\[CDATA\[(.*?)\]\]>/i) || [])[1] || source;
+export function normalizeSmartRecruiters(data, slug, companyName) {
+  return (data?.content || []).map((job) => {
+    const loc = job.location || {};
+    const place = [loc.city, loc.region, loc.country, loc.remote ? "Remote" : ""].filter(Boolean).join(", ");
     return row({
-      id: `${source}:${link || title}`,
-      url: link.trim(),
-      title,
-      company,
-      location: "Remote",
-      remote: true,
-      source,
-      postedAt: asTime(date),
-      description: title
+      id: `smartrecruiters:${slug}:${job.id}`,
+      url: job.ref || `https://jobs.smartrecruiters.com/${slug}/${job.id}`,
+      title: job.name,
+      company: companyName || slug,
+      location: place,
+      remote: !!loc.remote || /remote/i.test(place),
+      source: "SmartRecruiters",
+      postedAt: asTime(job.releasedDate),
+      description: job.name
     });
   }).filter((job) => job.url && job.title);
+}
+
+export function normalizeWorkable(data, slug, companyName) {
+  return (data?.jobs || []).map((job) => row({
+    id: `workable:${slug}:${job.shortcode || job.url}`,
+    url: job.url || job.application_url,
+    title: job.title,
+    company: companyName || slug,
+    location: job.location?.location_str || job.location?.country || "",
+    remote: /remote/i.test(job.location?.location_str || job.telecommuting || ""),
+    source: "Workable",
+    postedAt: asTime(job.published_on || job.created_at),
+    description: job.description || job.title
+  })).filter((job) => job.url && job.title);
+}
+
+export const DEFAULT_BOARDS = [
+  { kind: "lever", slug: "Sprinto", company: "Sprinto" },
+  { kind: "lever", slug: "gohighlevel", company: "HighLevel" },
+  { kind: "smartrecruiters", slug: "freshworks", company: "Freshworks" },
+  { kind: "lever", slug: "zeta", company: "Zeta" },
+  { kind: "ashby", slug: "atlan", company: "Atlan" },
+  { kind: "ashby", slug: "oyster", company: "Oyster" },
+  { kind: "lever", slug: "toptal", company: "Toptal" },
+  { kind: "greenhouse", slug: "gitlab", company: "GitLab" },
+  { kind: "ashby", slug: "zapier", company: "Zapier" },
+  { kind: "greenhouse", slug: "canonical", company: "Canonical" },
+  { kind: "ashby", slug: "helpscout", company: "Help Scout" },
+  { kind: "ashby", slug: "close", company: "Close" },
+  { kind: "greenhouse", slug: "intercom", company: "Intercom" },
+  { kind: "greenhouse", slug: "twilio", company: "Twilio" },
+  { kind: "greenhouse", slug: "okta", company: "Okta" },
+  { kind: "greenhouse", slug: "druva", company: "Druva" },
+  { kind: "lever", slug: "hevodata", company: "Hevo Data" },
+  { kind: "ashby", slug: "spotdraft", company: "SpotDraft" },
+  { kind: "smartrecruiters", slug: "swiggy", company: "Swiggy" },
+  { kind: "greenhouse", slug: "inmobi", company: "InMobi" },
+  { kind: "smartrecruiters", slug: "gong", company: "Gong" },
+  { kind: "lever", slug: "outreach", company: "Outreach" },
+  { kind: "greenhouse", slug: "salesloft", company: "Salesloft" },
+  { kind: "ashby", slug: "apollo", company: "Apollo" },
+  { kind: "ashby", slug: "clickup", company: "ClickUp" },
+  { kind: "ashby", slug: "webflow", company: "Webflow" },
+  { kind: "greenhouse", slug: "calendly", company: "Calendly" },
+  { kind: "greenhouse", slug: "asana", company: "Asana" },
+  { kind: "greenhouse", slug: "bitwarden", company: "Bitwarden" },
+  { kind: "ashby", slug: "1password", company: "1Password" },
+  { kind: "ashby", slug: "notion", company: "Notion" },
+  { kind: "ashby", slug: "linear", company: "Linear" },
+  { kind: "ashby", slug: "ramp", company: "Ramp" },
+  { kind: "greenhouse", slug: "brex", company: "Brex" },
+  { kind: "ashby", slug: "plaid", company: "Plaid" }
+];
+
+export function companyForBoard(kind, slug) {
+  const hit = DEFAULT_BOARDS.find((board) => board.kind === kind && board.slug.toLowerCase() === String(slug || "").toLowerCase());
+  return hit?.company || slug;
+}
+
+export function withDefaultBoards(boards) {
+  const merged = [...(boards || [])];
+  const have = new Set(merged.map((board) => `${board.kind}:${String(board.slug).toLowerCase()}`));
+  DEFAULT_BOARDS.forEach((board) => {
+    const key = `${board.kind}:${board.slug.toLowerCase()}`;
+    if (!have.has(key)) merged.push(board);
+  });
+  return merged;
+}
+
+export function isRemovedSource(job) {
+  const blob = `${job?.source || ""} ${job?.id || ""} ${job?.url || ""}`.toLowerCase();
+  return blob.includes("remoteok") || blob.includes("weworkremotely") || blob.includes("we work remotely");
+}
+
+export function purgeRemovedSources(state) {
+  const jobs = (state?.jobs || []).filter((job) => !isRemovedSource(job));
+  const scores = { ...(state?.scores || {}) };
+  (state?.jobs || []).filter(isRemovedSource).forEach((job) => { delete scores[job.id]; });
+  const lastSources = (state?.lastSources || []).filter((source) => !/remoteok|we work remotely/i.test(source.name || ""));
+  return { ...state, jobs, scores, lastSources };
 }
