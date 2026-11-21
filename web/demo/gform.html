@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Application questions</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #202124;
+      font: 16px/1.45 Arial, Helvetica, sans-serif;
+    }
+    .banner {
+      background: #f8f9fa;
+      color: #3c4043;
+      font-size: 13px;
+      padding: 8px 16px;
+      border-bottom: 1px solid #e6e6e6;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 28px 20px 80px; }
+    h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
+    .intro { color: #5f6368; margin: 0 0 28px; }
+    .q { margin: 0 0 28px; }
+    [role="heading"] { font-size: 16px; font-weight: 500; margin-bottom: 10px; }
+    .req { color: #d93025; }
+    [role="radio"], [role="checkbox"] {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 7px 2px;
+      cursor: pointer;
+    }
+    [role="radio"]::before, [role="checkbox"]::before {
+      content: "";
+      width: 18px;
+      height: 18px;
+      border: 2px solid #bdbdbd;
+      flex: none;
+      margin-top: 1px;
+      background: #fff;
+    }
+    [role="radio"]::before { border-radius: 50%; }
+    [role="checkbox"]::before { border-radius: 3px; }
+    [role="radio"][aria-checked="true"]::before {
+      border-color: #1a73e8;
+      box-shadow: inset 0 0 0 4px #fff;
+      background: #1a73e8;
+    }
+    [role="checkbox"][aria-checked="true"]::before {
+      border-color: #1a73e8;
+      background: #1a73e8;
+    }
+    textarea, select {
+      width: 100%;
+      margin-top: 8px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 12px;
+      font: inherit;
+      color: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    textarea:focus, select:focus { outline: none; border-color: #1a73e8; }
+    button[type="submit"] {
+      margin-top: 12px;
+      background: #1a73e8;
+      color: #fff;
+      border: 0;
+      border-radius: 4px;
+      padding: 10px 24px;
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    #sent {
+      margin-top: 16px;
+      color: #b3261e;
+      font-weight: 700;
+    }
+    label.sel { display: block; font-weight: 500; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="banner">Local test form modeled on a Google Forms application. It does not send anything.</div>
+  <main>
+    <h1>Application questions</h1>
+    <p class="intro">Required questions are marked. JobPilot may fill answers for review. It will not submit.</p>
+    <form id="application" data-ats="google-forms">
+      <div role="list">
+        <div class="q" role="listitem">
+          <div role="heading" aria-level="3">Have you completed an internship? <span class="req">*</span></div>
+          <div role="radiogroup" aria-label="Have you completed an internship?">
+            <div role="radio" tabindex="0" aria-checked="false">Yes, in cybersecurity, GRC, or IT audit</div>
+            <div role="radio" tabindex="0" aria-checked="false">Yes, in a customer-facing, implementation, or project role</div>
+            <div role="radio" tabindex="0" aria-checked="false">Yes, in another field</div>
+            <div role="radio" tabindex="0" aria-checked="false">No</div>
+          </div>
+        </div>
+
+        <div class="q" role="listitem">
+          <div role="heading" aria-level="3">Tell us about one internship that taught you something useful. What were you responsible for, what did you do, what changed because of your work, and what did you learn? Please give a specific example—an outcome or number helps us understand your contribution.</div>
+          <textarea aria-label="Tell us about one internship" name="internship-story"></textarea>
+        </div>
+
+        <div class="q" role="listitem">
+          <div role="heading" aria-level="3">How does your college report this result? <span class="req">*</span></div>
+          <div role="radiogroup" aria-label="How does your college report this result?">
+            <div role="radio" tabindex="0" aria-checked="false">CGPA out of 10</div>
+            <div role="radio" tabindex="0" aria-checked="false">CGPA out of 4</div>
+            <div role="radio" tabindex="0" aria-checked="false">Percentage</div>
+            <div role="radio" tabindex="0" aria-checked="false">Other</div>
+          </div>
+        </div>
+
+        <div class="q" role="listitem">
+          <div role="heading" aria-level="3">If your college reports CGPA on a 10-point scale, where does your current or final score fall? Skip this question if your college uses a different scale.</div>
+          <div role="radiogroup" aria-label="CGPA range">
+            <div role="radio" tabindex="0" aria-checked="false">Below 6.0</div>
+            <div role="radio" tabindex="0" aria-checked="false">6.0 – 6.9</div>
+            <div role="radio" tabindex="0" aria-checked="false">7.0 – 7.9</div>
+            <div role="radio" tabindex="0" aria-checked="false">8.0 – 8.9</div>
+            <div role="radio" tabindex="0" aria-checked="false">9.0 – 10.0</div>
+          </div>
+        </div>
+
+        <div class="q" role="listitem">
+          <div role="heading" aria-level="3">Which of these tools have you used?</div>
+          <div role="group" aria-label="Which of these tools have you used?">
+            <div role="checkbox" tabindex="0" aria-checked="false">HubSpot</div>
+            <div role="checkbox" tabindex="0" aria-checked="false">Salesforce</div>
+            <div role="checkbox" tabindex="0" aria-checked="false">Dripify</div>
+            <div role="checkbox" tabindex="0" aria-checked="false">Gong</div>
+          </div>
+        </div>
+
+        <div class="q" role="listitem">
+          <label class="sel" for="start">When can you start?</label>
+          <select id="start" name="start">
+            <option value="">Select</option>
+            <option value="now">Immediately</option>
+            <option value="2w">In 2 weeks</option>
+            <option value="30">In 30 days</option>
+            <option value="60">In 60 days</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Submit</button>
+      <p id="sent" hidden>Submitted. JobPilot should never have reached this message.</p>
+    </form>
+  </main>
+  <script>
+    document.addEventListener("click", (event) => {
+      const radio = event.target.closest("[role='radio']");
+      if (radio) {
+        const group = radio.closest("[role='radiogroup']");
+        group.querySelectorAll("[role='radio']").forEach((node) => {
+          node.setAttribute("aria-checked", node === radio ? "true" : "false");
+        });
+      }
+      const box = event.target.closest("[role='checkbox']");
+      if (box) {
+        const on = box.getAttribute("aria-checked") === "true";
+        box.setAttribute("aria-checked", on ? "false" : "true");
+      }
+    });
+    document.getElementById("application").addEventListener("submit", (event) => {
+      event.preventDefault();
+      document.body.dataset.submitted = "1";
+      document.getElementById("sent").hidden = false;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume tailor — JobPilot</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="nav">
+    <a class="word" href="index.html">JobPilot</a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="demo/gform.html">Sample form</a>
+      <button type="button" id="theme">Theme</button>
+    </nav>
+  </div>
+  <main class="wrap">
+    <h1>Resume tailor</h1>
+    <p class="lede">Paste a job description. The score and the preview use only the resume text. Nothing is uploaded.</p>
+    <div class="tool">
+      <div>
+        <label for="resume">Resume</label>
+        <textarea id="resume" spellcheck="false"></textarea>
+        <div class="actions">
+          <button type="button" id="load">Load .txt</button>
+          <button type="button" id="pdf-in">Load PDF</button>
+          <button type="button" id="restore">Restore sample</button>
+          <input id="file" type="file" accept=".txt,text/plain" hidden>
+          <input id="pdffile" type="file" accept="application/pdf,.pdf" hidden>
+        </div>
+      </div>
+      <div>
+        <label for="jd">Job description</label>
+        <textarea id="jd" spellcheck="false"></textarea>
+        <div class="actions">
+          <button type="button" id="sample">Sample SDR job</button>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="analyze">Score match</button>
+      <button type="button" class="primary" id="tailor">Tailor resume</button>
+    </div>
+    <p id="status" class="status"></p>
+    <section id="results" class="card" hidden>
+      <div class="metrics">
+        <div class="metric"><b id="score">—</b><span>Match</span></div>
+        <div class="metric"><b id="matched-n">—</b><span>Matched</span></div>
+        <div class="metric"><b id="missing-n">—</b><span>Missing</span></div>
+        <div class="metric"><b id="length">—</b><span id="words">Length</span></div>
+      </div>
+      <h2>Matched</h2>
+      <div id="matched" class="chips"></div>
+      <h2>Missing</h2>
+      <div id="missing" class="chips"></div>
+      <h2>Tick a keyword only if it is already true</h2>
+      <div id="ticks"></div>
+      <button type="button" id="apply-ticks">Add ticked skills and refresh</button>
+    </section>
+    <section class="sheet-wrap" style="margin-top:16px">
+      <div class="actions no-print">
+        <button type="button" class="primary" id="download-pdf">Download PDF</button>
+        <button type="button" id="download-txt">Download .txt</button>
+        <button type="button" id="print">Print</button>
+      </div>
+      <div id="preview"></div>
+    </section>
+    <details class="card">
+      <summary>Draft one application answer (optional, uses your Groq key in this browser)</summary>
+      <p class="caution">The key stays in localStorage. It is sent only to api.groq.com when you press Write.</p>
+      <label for="key">Groq API key</label>
+      <input id="key" type="password" autocomplete="off">
+      <label class="check"><input id="cheap" type="checkbox"> Save credits (GPT-OSS 20B)</label>
+      <label for="question">Question</label>
+      <textarea id="question">Tell us about one internship that taught you something useful. What were you responsible for, what did you do, what changed because of your work, and what did you learn? Please give a specific example—an outcome or number helps us understand your contribution.</textarea>
+      <div class="actions">
+        <button type="button" class="primary" id="write">Write answer</button>
+      </div>
+      <p id="answer-status" class="status"></p>
+      <textarea id="answer" placeholder="The draft shows up here for editing."></textarea>
+    </details>
+  </main>
+  <script type="module" src="js/tailor.js"></script>
+</body>
+</html>

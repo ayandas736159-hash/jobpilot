@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <strong>JobPilot</strong>
+        <small>Review first. You submit.</small>
+      </div>
+    </div>
+    <button type="button" id="theme" class="ghost" title="Toggle theme">Theme</button>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button type="button" class="tab on" data-tab="job">Match</button>
+    <button type="button" class="tab" data-tab="fill">Autofill</button>
+    <button type="button" class="tab" data-tab="profile">Profile</button>
+    <button type="button" class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="job" class="view">
+      <div class="row">
+        <button type="button" class="primary" id="extract">Read this page</button>
+        <button type="button" id="sample-jd">Sample SDR job</button>
+      </div>
+      <label for="jd">Job description</label>
+      <textarea id="jd" spellcheck="true" placeholder="Paste a job description, or read it from the open tab."></textarea>
+      <div class="row">
+        <button type="button" class="primary" id="analyze">Score match</button>
+        <button type="button" class="primary" id="tailor">Tailor resume</button>
+      </div>
+      <p id="job-status" class="status"></p>
+      <div id="score-card" class="card" hidden>
+        <div class="score-line">
+          <div class="ring" id="ring"><span id="score">—</span></div>
+          <div>
+            <strong id="score-label">Keyword overlap</strong>
+            <p id="score-meta" class="muted"></p>
+          </div>
+        </div>
+        <h3>On your resume</h3>
+        <div id="matched" class="chips"></div>
+        <h3>Missing — add only if true</h3>
+        <div id="missing" class="ticks"></div>
+      </div>
+      <div id="preview-wrap" hidden>
+        <div class="row">
+          <h3>Tailored preview</h3>
+          <button type="button" id="pdf">Download PDF</button>
+          <button type="button" id="txt">Download .txt</button>
+        </div>
+        <div id="preview" class="preview"></div>
+      </div>
+    </section>
+
+    <section id="fill" class="view" hidden>
+      <div class="row">
+        <button type="button" class="primary" id="scan">Scan form</button>
+        <button type="button" id="write">Write answers</button>
+      </div>
+      <div class="row">
+        <button type="button" id="fill-page">Fill this page</button>
+        <button type="button" id="next-page">Next page</button>
+      </div>
+      <p id="fill-status" class="status"></p>
+      <p id="tokens" class="token">Tokens this session: 0</p>
+      <div id="guard" class="guard" hidden>Submit is highlighted on the page. JobPilot will not click it.</div>
+      <div id="proposals"></div>
+    </section>
+
+    <section id="profile" class="view" hidden>
+      <p class="muted">Stored only in this browser. The sample is Padmanava Das’s public resume.</p>
+      <label for="p-name">Name</label>
+      <input id="p-name" autocomplete="name">
+      <div class="split">
+        <div>
+          <label for="p-email">Email</label>
+          <input id="p-email" autocomplete="email">
+        </div>
+        <div>
+          <label for="p-phone">Phone</label>
+          <input id="p-phone" autocomplete="tel">
+        </div>
+      </div>
+      <label for="p-linkedin">LinkedIn</label>
+      <input id="p-linkedin">
+      <label for="p-portfolio">Portfolio</label>
+      <input id="p-portfolio">
+      <label for="p-location">Location</label>
+      <input id="p-location">
+      <label for="p-auth">Work authorization</label>
+      <input id="p-auth" placeholder="Leave blank if you do not want this guessed">
+      <div class="split">
+        <div>
+          <label for="p-notice">Notice period</label>
+          <input id="p-notice" placeholder="Immediately">
+        </div>
+        <div>
+          <label for="p-salary">Expected salary</label>
+          <input id="p-salary">
+        </div>
+      </div>
+      <label for="p-links">Other links</label>
+      <input id="p-links">
+      <label for="p-resume">Resume text</label>
+      <textarea id="p-resume" spellcheck="false"></textarea>
+      <div class="row">
+        <button type="button" id="load-txt">Load .txt</button>
+        <button type="button" id="load-pdf">Load PDF</button>
+        <button type="button" id="restore">Restore sample</button>
+        <input id="file-txt" type="file" accept=".txt,text/plain" hidden>
+        <input id="file-pdf" type="file" accept="application/pdf,.pdf" hidden>
+      </div>
+      <h3>Experience stories</h3>
+      <p class="muted">One fact per line. Answers may use only these facts and the resume. SoluLab is seeded with the real campaign numbers.</p>
+      <div id="stories"></div>
+      <div class="row">
+        <button type="button" id="add-story">Add story</button>
+        <button type="button" class="primary" id="save-profile">Save profile</button>
+      </div>
+      <p id="profile-status" class="status"></p>
+    </section>
+
+    <section id="settings" class="view" hidden>
+      <label for="s-key">Groq API key</label>
+      <input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_…">
+      <p class="muted">Saved in chrome.storage.local. Sent only to api.groq.com. Never committed and never injected into the job page.</p>
+      <label class="check"><input id="s-save" type="checkbox"> Save credits — use GPT-OSS 20B</label>
+      <p id="model-note" class="muted"></p>
+      <label for="s-custom">Custom model id (optional)</label>
+      <input id="s-custom" placeholder="openai/gpt-oss-120b">
+      <div class="split">
+        <div>
+          <label for="s-min">Min words</label>
+          <input id="s-min" type="number" min="40" max="400" value="80">
+        </div>
+        <div>
+          <label for="s-max">Max words</label>
+          <input id="s-max" type="number" min="60" max="500" value="150">
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="primary" id="save-settings">Save settings</button>
+        <button type="button" id="test-key">Test key</button>
+      </div>
+      <p id="settings-status" class="status"></p>
+    </section>
+  </main>
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

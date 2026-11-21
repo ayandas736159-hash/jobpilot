@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample application — Northwind</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f6f4; color: #1c2420; font: 16px/1.45 "Segoe UI", sans-serif; }
+    header { background: #0f6b4c; color: #fff; padding: 22px 20px; }
+    header h1 { margin: 0 0 4px; font-size: 22px; }
+    header p { margin: 0; opacity: 0.9; }
+    main { max-width: 820px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
+    article, form { background: #fff; border: 1px solid #d9e2dc; border-radius: 12px; padding: 18px; }
+    .job-description h2 { margin: 0 0 8px; font-size: 18px; }
+    label { display: block; font-weight: 650; margin: 12px 0 6px; }
+    input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #c9d4ce; border-radius: 8px; font: inherit; }
+    textarea { min-height: 110px; }
+    .row { display: flex; gap: 8px; margin-top: 16px; }
+    button { border: 0; border-radius: 8px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+    #nextBtn { background: #e7f3ec; color: #0f6b4c; }
+    #submitBtn { background: #0f6b4c; color: #fff; }
+    .hint { color: #5c6b64; font-size: 14px; }
+    #sent { color: #9f2d2d; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sales Development Representative</h1>
+    <p>Northwind · Remote · Local Greenhouse / Lever-style test form</p>
+  </header>
+  <main>
+    <article class="job-description">
+      <h2>About the role</h2>
+      <p>We are hiring a Sales Development Representative to generate qualified pipeline for our B2B SaaS platform. You will prospect with LinkedIn Sales Navigator and HubSpot, write cold email cadences, and book discovery calls. Salesforce experience is welcome. Comfort with cold calling is required.</p>
+    </article>
+    <form id="application_form" data-ats="greenhouse">
+      <section id="page1">
+        <p class="hint">Page 1 of 2. Standard fields use Greenhouse names, and LinkedIn uses a Lever-style name.</p>
+        <label for="first_name">First name</label>
+        <input id="first_name" name="job_application[first_name]" autocomplete="given-name">
+        <label for="last_name">Last name</label>
+        <input id="last_name" name="job_application[last_name]" autocomplete="family-name">
+        <label for="email">Email</label>
+        <input id="email" name="job_application[email]" type="email" autocomplete="email">
+        <label for="phone">Phone</label>
+        <input id="phone" name="job_application[phone]" type="tel" autocomplete="tel">
+        <label for="linkedin">LinkedIn URL</label>
+        <input id="linkedin" name="urls[LinkedIn]" type="url" placeholder="https://www.linkedin.com/in/">
+        <label for="location">Location</label>
+        <input id="location" name="job_application[location]" autocomplete="address-level2">
+        <div class="row">
+          <button type="button" id="nextBtn">Next</button>
+        </div>
+      </section>
+      <section id="page2" hidden>
+        <p class="hint">Page 2 of 2. Open-ended questions. The submit button is yours to press.</p>
+        <div class="application-question">
+          <div class="application-label">Why do you want to work at Northwind?</div>
+          <textarea name="job_application[answers_attributes][0][text_value]"></textarea>
+        </div>
+        <label for="cover">Cover letter</label>
+        <textarea id="cover" name="cover_letter"></textarea>
+        <div class="row">
+          <button type="button" id="backBtn">Back</button>
+          <button type="submit" id="submitBtn">Submit application</button>
+        </div>
+        <p id="sent" hidden>Submitted. JobPilot should never have reached this message.</p>
+      </section>
+    </form>
+  </main>
+  <script>
+    const page1 = document.getElementById("page1");
+    const page2 = document.getElementById("page2");
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      page1.hidden = true;
+      page2.hidden = false;
+    });
+    document.getElementById("backBtn").addEventListener("click", () => {
+      page2.hidden = true;
+      page1.hidden = false;
+    });
+    document.getElementById("application_form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      document.body.dataset.submitted = "1";
+      document.getElementById("sent").hidden = false;
+    });
+  </script>
+</body>
+</html>

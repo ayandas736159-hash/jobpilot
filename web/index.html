@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot — resume match and application review</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="nav">
+    <a class="word" href="index.html">JobPilot</a>
+    <nav>
+      <a href="tailor.html">Resume tailor</a>
+      <a href="demo/gform.html">Sample form</a>
+      <button type="button" id="theme">Theme</button>
+    </nav>
+  </div>
+  <header class="wrap hero">
+    <div>
+      <h1>Apply with your real story. Submit it yourself.</h1>
+      <p class="lede">JobPilot scores a job description against Padmanava Das’s resume, reorders the bullets he already has, and drafts application answers from those facts. The final Submit click stays with him.</p>
+      <div class="actions">
+        <a class="btn primary" href="tailor.html">Open the tailor</a>
+        <a class="btn" href="#install">Install the extension</a>
+      </div>
+    </div>
+    <aside class="panel" aria-hidden="true">
+      <header><span>JobPilot</span><span class="dots"><i></i><i></i><i></i></span></header>
+      <div class="body">
+        <div class="fake-score"><div class="ring"><b>53%</b></div><div><strong>SDR keyword overlap</strong><div>HubSpot and Dripify are in. Salesforce is not.</div></div></div>
+        <div class="chips"><span class="chip">HubSpot</span><span class="chip">Dripify</span><span class="chip bad">Salesforce</span><span class="chip bad">Cold calling</span></div>
+        <p class="answer">I was responsible for LinkedIn outbound at SoluLab. I launched 4 Dripify campaigns for Coverline and reached about 760 Sales Navigator leads…</p>
+      </div>
+    </aside>
+  </header>
+  <section class="wrap grid">
+    <article class="card"><h2>Match</h2><p>A keyword score and the terms still missing. It is overlap, not a hiring decision. Missing words are added only if you tick them.</p></article>
+    <article class="card"><h2>Tailor</h2><p>The one-page resume is rebuilt by reordering your real sentences and skills. It does not invent employers, tools, or numbers.</p></article>
+    <article class="card"><h2>Answer</h2><p>Open-ended questions get one grounded draft: responsibility, what you did, a real number, and what you learned. You edit it before it touches the form.</p></article>
+  </section>
+  <section class="wrap" id="install">
+    <article class="card">
+      <h2>Install the extension (load unpacked)</h2>
+      <ol class="steps">
+        <li>Clone this repository and keep the <code>extension</code> folder.</li>
+        <li>Open <code>chrome://extensions</code>.</li>
+        <li>Turn on Developer mode.</li>
+        <li>Choose “Load unpacked” and select the <code>extension</code> folder.</li>
+        <li>Pin JobPilot. Click the icon to open the side panel.</li>
+        <li>In Settings, paste your own Groq API key. It stays in chrome.storage.local.</li>
+        <li>Try it on the local forms: <a href="demo/apply.html">Greenhouse / Lever sample</a> and <a href="demo/gform.html">the application-question sample</a>. Serve this <code>web</code> folder, or open those files from a local server. Chrome content scripts do not run on <code>file://</code> pages unless you allow file access.</li>
+      </ol>
+    </article>
+  </section>
+  <section class="wrap privacy">
+    <h2>Privacy</h2>
+    <p>The profile, resume, and API key stay in your browser. The extension sends the key only to <code>api.groq.com</code>, and only when you write an answer or resolve an ambiguous choice. Job pages never receive the key. There is no JobPilot server and no serverless function. The web tailor uses the same rule: a key you type is kept in localStorage on this device.</p>
+  </section>
+  <footer class="wrap">JobPilot is a local helper for Padmanava Das. It will not click Submit or Apply.</footer>
+  <script>
+    const root = document.documentElement;
+    const saved = localStorage.getItem("jobpilot.theme");
+    if (saved) root.dataset.theme = saved;
+    document.getElementById("theme").addEventListener("click", () => {
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      localStorage.setItem("jobpilot.theme", next);
+    });
+  </script>
+</body>
+</html>
