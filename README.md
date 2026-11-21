@@ -33,7 +33,7 @@ Settings has a custom model id if an account still has an older model. Multiple-
 
 To update from a ZIP: download the repository ZIP, replace the old `extension` folder with the one inside the ZIP, then on `chrome://extensions` click Reload on JobPilot and accept any new permissions. From git, `git pull` and reload the extension the same way.
 
-The jobs dashboard is a full page inside the extension. Open the side panel, choose Jobs, then Open jobs dashboard. Checks run about every 30 minutes only while Chrome is open. Tailor for this job on the Match tab uses your Groq key and the cheaper model. It rewrites wording from your real resume and lists gaps instead of adding them.
+The jobs dashboard is a full page inside the extension. Open the side panel, choose Jobs, then Open jobs dashboard. Checks run about every 30 minutes only while Chrome is open. US-only, UK-only, and senior roles stay hidden until you turn on Show region-locked jobs. The filters panel lists each source as ok or error. The Buddy tab chats with the cheaper Groq model and keeps the last 10 messages on this computer. Tailor for this job on the Match tab uses your Groq key and the cheaper model. It rewrites wording from your real resume and lists gaps instead of adding them.
 
 Content scripts run on `http` and `https` pages. To try the included forms, serve the site (`npm start`) and open:
 

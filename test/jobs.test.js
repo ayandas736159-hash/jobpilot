@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { defaultProfile } from "../shared/profile.js";
 import {
   applyScoreCache,
   jobsNeedingScore,
@@ -11,6 +12,7 @@ import {
   normalizeRemotive,
   parseBoards,
   parseFitScores,
+  profileBrief,
   sortByFit
 } from "../shared/jobs.js";
 
@@ -20,6 +22,9 @@ test("target titles match and senior or country-locked roles do not", () => {
   assert.equal(matchJob({ title: "Customer Success Associate", location: "APAC, remote", remote: true }), true);
   assert.equal(matchJob({ title: "Senior Customer Success Manager", location: "Remote", remote: true }), false);
   assert.equal(matchJob({ title: "Sales Development Representative", location: "United States", remote: true }), false);
+  assert.equal(matchJob({ title: "SDR", location: "Remote, US Only", remote: true }), false);
+  assert.equal(matchJob({ title: "BDR", location: "Remote UK", remote: true }), false);
+  assert.equal(matchJob({ title: "Sales Manager", location: "Remote", remote: true }), false);
   assert.equal(matchJob({ title: "Account Executive", location: "Remote", remote: true }), false);
 });
 
@@ -44,10 +49,20 @@ test("smart match scores each new job once and notifies only high fits", () => {
   assert.deepEqual(jobsNeedingScore(jobs, cache, 1).map((job) => job.id), ["b"]);
   const scored = sortByFit(applyScoreCache(jobs, { ...cache, b: { score: 40, reason: "Weak" } }));
   assert.deepEqual(scored.map((job) => job.id), ["a", "b", "c"]);
-  const parsed = parseFitScores("```json\n{\"jobs\":[{\"id\":\"b\",\"score\":140,\"reason\":\"Strong SDR fit\"},{\"id\":\"nope\",\"score\":10,\"reason\":\"x\"}]}\n```", ["b"]);
-  assert.deepEqual(parsed, [{ id: "b", score: 100, reason: "Strong SDR fit" }]);
+  const parsed = parseFitScores("```json\n{\"jobs\":[{\"id\":\"b\",\"score\":82,\"reason\":\"Outbound overlaps this SDR role\"},{\"id\":\"c\",\"score\":18,\"reason\":\"US only\"},{\"id\":\"nope\",\"score\":10,\"reason\":\"x\"},{\"id\":\"a\"}]}\n```", ["a", "b", "c"]);
+  assert.deepEqual(parsed.map((item) => item.score), [82, 18]);
+  assert.equal(parsed.some((item) => item.score === 25), false);
   assert.equal(jobsToNotify([{ id: "b", fit: 70 }, { id: "c", fit: 40 }], { smartOn: true, fallback: false, threshold: 60 }).length, 1);
   assert.equal(jobsToNotify([{ id: "c", fit: 40 }], { smartOn: true, fallback: true, threshold: 60 }).length, 1);
+});
+
+test("the scorer brief includes real outbound experience from the resume", () => {
+  const brief = profileBrief({ resumeText: defaultProfile().resumeText, stories: [] });
+  assert.match(brief, /SoluLab/);
+  assert.match(brief, /760/);
+  assert.match(brief, /strong fit/);
+  const fromStories = profileBrief(defaultProfile());
+  assert.match(fromStories, /Dripify|Foundertruth/);
 });
 
 test("public board payloads become jobs", () => {

@@ -12,6 +12,8 @@ import {
   normalizeGreenhouse,
   normalizeHimalayas,
   normalizeLever,
+  normalizeJobicy,
+  normalizeNomads,
   normalizeRemoteOk,
   normalizeRemotive,
   normalizeRss,
@@ -93,13 +95,15 @@ async function fetchText(url) {
 
 async function collect(state) {
   const jobs = [];
-  const errors = [];
+  const sources = [];
   const tasks = [
-    ["Remotive", "https://remotive.com/api/remote-jobs?category=sales", (text) => normalizeRemotive(JSON.parse(text))],
+    ["Remotive sales", "https://remotive.com/api/remote-jobs?category=sales", (text) => normalizeRemotive(JSON.parse(text))],
     ["Remotive support", "https://remotive.com/api/remote-jobs?category=customer-support", (text) => normalizeRemotive(JSON.parse(text))],
     ["RemoteOK", "https://remoteok.com/api", (text) => normalizeRemoteOk(JSON.parse(text))],
     ["Himalayas", "https://himalayas.app/jobs/api", (text) => normalizeHimalayas(JSON.parse(text))],
     ["Arbeitnow", "https://www.arbeitnow.com/api/job-board-api", (text) => normalizeArbeitnow(JSON.parse(text))],
+    ["Jobicy", "https://jobicy.com/api/v2/remote-jobs?count=50&tag=sales", (text) => normalizeJobicy(JSON.parse(text))],
+    ["Working Nomads", "https://www.workingnomads.com/api/exposed_jobs/", (text) => normalizeNomads(JSON.parse(text))],
     ["We Work Remotely", "https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss", (text) => normalizeRss(text, "We Work Remotely")]
   ];
   (state.boards || []).forEach((board) => {
@@ -114,12 +118,15 @@ async function collect(state) {
   await Promise.all(tasks.map(async ([name, url, parse]) => {
     try {
       const text = await fetchText(url);
-      jobs.push(...parse(text).filter((job) => matchJob(job, state.filters || DEFAULT_FILTERS)));
+      const parsed = parse(text);
+      const matched = parsed.filter((job) => matchJob(job, state.filters || DEFAULT_FILTERS));
+      jobs.push(...matched);
+      sources.push({ name, ok: true, fetched: parsed.length, matched: matched.length, error: "" });
     } catch (error) {
-      errors.push(`${name}: ${error.message}`);
+      sources.push({ name, ok: false, fetched: 0, matched: 0, error: String(error.message || error).slice(0, 80) });
     }
   }));
-  return { jobs, errors };
+  return { jobs, sources };
 }
 
 function storageGet(key) {
@@ -145,7 +152,9 @@ async function scoreJobs(state, jobs) {
       messages: smartMatchMessages(profileBrief(profile), todo),
       maxTokens: 1200
     });
-    parseFitScores(result.text, todo.map((job) => job.id)).forEach((item) => {
+    const parsed = parseFitScores(result.text, todo.map((job) => job.id));
+    if (!parsed.length) throw new Error("no usable scores");
+    parsed.forEach((item) => {
       cache[item.id] = { score: item.score, reason: item.reason };
     });
     const scoredIds = new Set(jobs.map((job) => job.id));
@@ -170,18 +179,32 @@ async function scoreJobs(state, jobs) {
 
 async function poll(manual) {
   const state = await loadState();
-  const { jobs: found, errors } = await collect(state);
+  if (state.scoreVersion !== 2 || state.filtersVersion !== 2) {
+    state.scores = {};
+    state.scoreVersion = 2;
+    state.filters = { ...DEFAULT_FILTERS, ...(state.filters || {}), titles: DEFAULT_FILTERS.titles };
+    state.showLocked = false;
+    state.filtersVersion = 2;
+  }
+  const { jobs: found, sources } = await collect(state);
   const first = !state.lastChecked;
   const { jobs: merged, fresh } = mergeJobs(state.jobs || [], found, Date.now());
   const scored = await scoreJobs(state, merged);
   const jobs = scored.jobs;
-  const note = [errors.slice(0, 3).join(" · "), scored.note].filter(Boolean).join(" · ");
+  const sourceErrors = sources.filter((item) => !item.ok).map((item) => `${item.name}: ${item.error}`);
+  const note = [scored.note, sourceErrors.slice(0, 3).join(" · ")].filter(Boolean).join(" · ");
+  const summary = first
+    ? `First check saved ${fresh.length} jobs. Notifications start on the next check.`
+    : `${fresh.length} new this check. ${jobs.length} saved.`;
   const next = {
     ...state,
     jobs,
     scores: scored.cache,
     lastChecked: Date.now(),
     lastSmartTokens: scored.tokens,
+    lastSources: sources,
+    lastAdded: fresh.length,
+    lastSummary: summary,
     lastError: note
   };
   await saveState(next);

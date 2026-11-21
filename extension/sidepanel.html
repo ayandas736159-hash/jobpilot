@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JobPilot</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="buddy.css">
 </head>
 <body>
   <header class="top">
@@ -23,6 +24,7 @@
     <button type="button" class="tab" data-tab="fill">Autofill</button>
     <button type="button" class="tab" data-tab="profile">Profile</button>
     <button type="button" class="tab" data-tab="settings">Settings</button>
+    <button type="button" class="tab" data-tab="buddy">Buddy</button>
   </nav>
 
   <main>
@@ -164,7 +166,12 @@
       </div>
       <p id="settings-status" class="status"></p>
     </section>
+    <section id="buddy" class="view" hidden>
+      <p class="muted">Buddy uses your Groq key and remembers the last 10 messages on this computer.</p>
+      <div id="buddy-root"></div>
+    </section>
   </main>
+  <script type="module" src="buddy.js"></script>
   <script type="module" src="sidepanel.js"></script>
   <script>
     (function () {
