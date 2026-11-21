@@ -9,8 +9,6 @@
 .job header { display: flex; justify-content: space-between; gap: 12px; }
 .job .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .fit { color: var(--accent); font-size: 13px; margin-top: 4px; font-weight: 800; }
-.buddy-dock .buddy-chat { display: none; }
-.buddy-dock.open .buddy-chat { display: block; }
 #check::before { content: "🔄 "; }
 #save::before { content: "💾 "; }
 .job.applied, .job.dismissed { opacity: 0.55; }
