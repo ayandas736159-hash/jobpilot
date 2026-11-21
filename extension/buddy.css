@@ -1,26 +1,76 @@
 .buddy-dock { position: fixed; right: 16px; bottom: 16px; z-index: 20; width: min(320px, calc(100% - 24px)); }
-#buddy-root { display: grid; gap: 8px; }
-.buddy-doll { width: 92px; height: 110px; margin-left: auto; cursor: pointer; transform-origin: 50% 100%; }
+.buddy-dock .buddy-toolbar { display: none; }
+.buddy-dock.open .buddy-toolbar { display: flex; }
+.buddy-dock .buddy-compose { display: none; }
+.buddy-dock.open .buddy-compose { display: block; }
+.buddy-dock .buddy-messages { display: none; max-height: 220px; }
+.buddy-dock.open .buddy-messages { display: flex; max-height: 220px; }
+
+.buddy-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#buddy.view { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-top: 4px; }
+#buddy-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.buddy-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.buddy-head { flex: none; position: relative; display: flex; justify-content: center; }
+.buddy-doll { width: 64px; height: 78px; border: 0; background: transparent; padding: 0; cursor: pointer; transform-origin: 50% 100%; }
 .buddy-doll.idle { animation: buddy-bob 2.4s ease-in-out infinite; }
 .buddy-doll.nod { animation: buddy-nod 0.45s ease; }
 .buddy-doll.think { animation: buddy-tilt 0.8s ease-in-out infinite; }
 .buddy-doll.wave .arm { animation: buddy-wave 0.6s ease 2; }
 .buddy-doll.talk .mouth { animation: buddy-mouth 0.18s ease-in-out infinite; }
 .eye { transform-origin: center; animation: buddy-blink 4.5s infinite; }
-.buddy-chat, .buddy-pop {
-  background: var(--card, #fffdf6);
-  color: var(--ink, #1a2140);
-  border: 3px solid var(--line, #1a2140);
-  border-radius: 18px;
-  box-shadow: 4px 4px 0 #ff8ec8;
-  padding: 8px;
+
+.buddy-pop {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  max-width: 58%;
+  border: 2px solid var(--line, #1a2140);
+  border-radius: 12px;
+  background: #fffdf6;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.3;
+  box-shadow: 3px 3px 0 #ff8ec8;
+  cursor: pointer;
+  text-align: left;
 }
-.buddy-log { max-height: 220px; overflow: auto; display: grid; gap: 6px; }
-.buddy-log p { margin: 0; }
-.buddy-log .me { text-align: right; }
-.buddy-row { display: flex; gap: 6px; }
+.buddy-toolbar { flex: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.buddy-model-wrap { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted, #3d4c78); }
+.buddy-toolbar button, #buddy-send, #buddy-mute, #buddy-clear { font-size: 13px; padding: 6px 10px; }
+.buddy-messages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.buddy-bubble {
+  max-width: 92%;
+  border: 2px solid var(--line, #1a2140);
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: var(--card, #fffdf6);
+  box-shadow: 3px 3px 0 #8ecbff;
+}
+.buddy-bubble.me { align-self: flex-end; background: #fff9c4; box-shadow: 3px 3px 0 #ff8ec8; }
+.buddy-bubble.them { align-self: flex-start; }
+.buddy-label { display: block; font-size: 11px; font-weight: 700; margin-bottom: 4px; color: var(--muted, #3d4c78); }
+.buddy-md { font-size: 14px; line-height: 1.4; word-break: break-word; }
+.buddy-md p { margin: 0 0 6px; }
+.buddy-md p:last-child { margin-bottom: 0; }
+.buddy-md ul, .buddy-md ol { margin: 4px 0 6px 18px; padding: 0; }
+.buddy-md li { margin-bottom: 4px; }
+.buddy-md table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.buddy-md th, .buddy-md td { border: 1px solid var(--line, #1a2140); padding: 4px 6px; text-align: left; }
+.buddy-md code { font-family: var(--mono, monospace); background: #f2f5ff; padding: 1px 4px; border-radius: 4px; }
+.buddy-md a { color: #0f7a62; font-weight: 600; }
+.buddy-compose { flex: none; border-top: 2px dashed var(--line, #1a2140); padding-top: 8px; }
+.buddy-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .buddy-row input { flex: 1; }
-.buddy-pop { cursor: pointer; }
+.buddy-row:last-child { margin-bottom: 0; }
+
 @keyframes buddy-bob { 50% { transform: translateY(-4px) rotate(-2deg); } }
 @keyframes buddy-nod { 40% { transform: rotate(8deg) translateY(2px); } }
 @keyframes buddy-tilt { 50% { transform: rotate(-8deg); } }

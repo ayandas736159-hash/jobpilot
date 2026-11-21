@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sprinto careers (demo)</title>
+  <link rel="stylesheet" href="../sidepanel.css">
+  <link rel="stylesheet" href="../content.css">
+  <style>
+    body { max-width: 720px; margin: 24px auto; padding: 0 16px; background: #fffdf6; }
+    .role { border: 2px solid #1a2140; border-radius: 12px; padding: 12px; margin: 12px 0; background: #fff; }
+    h1 { font-size: 22px; }
+    .meta { color: #3d4c78; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Careers at Sprinto (demo)</h1>
+  <article class="role">
+    <h2><a href="https://jobs.lever.co/sprinto/sdr-worldwide">Sales Development Representative</a></h2>
+    <p class="meta">Remote · Worldwide · Sales</p>
+  </article>
+  <article class="role">
+    <h2><a href="https://jobs.lever.co/sprinto/cs-associate-india">Customer Success Associate</a></h2>
+    <p class="meta">Remote · India · Customer Success</p>
+  </article>
+  <article class="role">
+    <h2><a href="https://jobs.lever.co/sprinto/bdr-us-only">Business Development Representative</a></h2>
+    <p class="meta">Remote · US only · Sales</p>
+  </article>
+  <article class="role">
+    <h2><a href="https://jobs.lever.co/sprinto/senior-sales-manager">Senior Sales Manager</a></h2>
+    <p class="meta">Remote · 8+ years · Sales</p>
+  </article>
+  <script type="module">
+    import { applyBuddyHighlights, extractBuddyListings } from "../lib/buddy-listings.js";
+    const jobs = extractBuddyListings(document);
+    applyBuddyHighlights(document, [
+      { idx: 0, score: 87, reason: "Entry SDR, worldwide" },
+      { idx: 1, score: 78, reason: "India CS associate" }
+    ]);
+    window.demoJobs = jobs;
+  </script>
+</body>
+</html>
