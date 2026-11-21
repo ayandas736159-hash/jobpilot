@@ -25,6 +25,7 @@
     <button type="button" class="tab" data-tab="profile">Profile</button>
     <button type="button" class="tab" data-tab="settings">Settings</button>
     <button type="button" class="tab" data-tab="buddy">Buddy</button>
+    <button type="button" class="tab" data-tab="crm">CRM</button>
   </nav>
 
   <main>
@@ -38,7 +39,10 @@
       <div class="row">
         <button type="button" class="primary" id="analyze">Score match</button>
         <button type="button" class="primary" id="tailor">Tailor for this job</button>
+        <button type="button" id="email-job">Email the hiring team</button>
+        <button type="button" id="save-crm">Save to CRM</button>
       </div>
+      <div id="outreach" hidden></div>
       <p id="job-status" class="status"></p>
       <div id="score-card" class="card" hidden>
         <div class="score-line">
@@ -165,6 +169,17 @@
         <button type="button" id="test-key">Test key</button>
       </div>
       <p id="settings-status" class="status"></p>
+    </section>
+    <section id="crm" class="view" hidden>
+      <div id="crm-stats" class="muted"></div>
+      <div id="crm-draft"></div>
+      <div class="row">
+        <button type="button" id="crm-board" class="primary">Board</button>
+        <button type="button" id="crm-table">Table</button>
+        <button type="button" id="crm-export">Export CSV</button>
+        <label class="ghost">Import CSV<input id="crm-import" type="file" accept=".csv,text/csv" hidden></label>
+      </div>
+      <div id="crm-list"></div>
     </section>
     <section id="buddy" class="view" hidden>
       <div id="buddy-root"></div>

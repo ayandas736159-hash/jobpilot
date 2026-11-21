@@ -1,4 +1,15 @@
-import { DEFAULT_FILTERS, matchJob, profileBrief } from "./jobs.js";
+import { DEFAULT_FILTERS, isRegionLocked, matchJob, profileBrief } from "./jobs.js";
+
+const CLOSEST = /sales|customer success|account executive|\bsdr\b|\bbdr\b|business development|growth|partner|account manager/i;
+
+export function closestPageJobs(jobs) {
+  return (jobs || []).filter((job) => {
+    const blob = `${job.title || ""} ${job.team || ""} ${job.location || ""}`;
+    if (!CLOSEST.test(blob)) return false;
+    if (isRegionLocked({ title: job.title, location: job.location, description: job.team || "" })) return false;
+    return true;
+  });
+}
 
 export function filterPageJobs(jobs, filters = DEFAULT_FILTERS) {
   return (jobs || []).filter((job) => matchJob({

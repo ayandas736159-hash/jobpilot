@@ -201,6 +201,12 @@ button:active, .btn:active { transform: translateY(2px); box-shadow: 1px 1px 0 v
 .tab[data-tab="profile"]::before { content: "🎒 "; }
 .tab[data-tab="settings"]::before { content: "🎨 "; }
 .tab[data-tab="buddy"]::before { content: "🐣 "; }
+.tab[data-tab="crm"]::before { content: "📌 "; }
+.kanban { display: grid; gap: 8px; }
+.kanban-col { border: 2px solid var(--line); border-radius: 12px; padding: 8px; background: var(--card); }
+.crm-card { border: 2px solid var(--line); border-radius: 10px; padding: 8px; margin-top: 6px; background: #fffdf6; }
+.crm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.crm-table td, .crm-table th { border-bottom: 1px solid var(--line); padding: 4px; text-align: left; }
 #extract::before { content: "👀 "; }
 #sample-jd::before { content: "🌟 "; }
 #analyze::before { content: "⭐ "; }
