@@ -1,4 +1,5 @@
 import { SAMPLE_JD, analyzeResume, renderResumeHtml, resumeToText, tailorResume } from "./lib/ats.js";
+import { bestScan, connectFailureMessage, isWebPage, pickTab } from "./lib/connect.js";
 import { groqAnswer, groqCheckKey, groqChoice } from "./lib/groq.js";
 import { MODELS } from "./lib/models.js";
 import { extractPdfText } from "./lib/pdf-text.js";
@@ -16,7 +17,8 @@ const state = {
   scan: null,
   modelCache: null,
   tokens: 0,
-  pageUrl: ""
+  pageUrl: "",
+  frameId: null
 };
 
 function storageGet(area, keys) {
@@ -138,23 +140,97 @@ function readSettingsForm() {
 }
 
 async function activeTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab.");
-  return tab;
+  const [focused] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["normal"] });
+  const tabs = windows.flatMap((win) => win.tabs || []);
+  const picked = pickTab(tabs, focused?.id);
+  if (picked?.id) return picked;
+  if (focused?.id && isWebPage(focused.url || "")) return focused;
+  if (focused?.url && !isWebPage(focused.url)) {
+    throw new Error(connectFailureMessage(focused.url));
+  }
+  throw new Error("No application tab is active. Open the job form, then scan again.");
+}
+
+async function frameIds(tabId) {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: () => location.href
+  });
+  return results.map((item) => item.frameId);
+}
+
+async function askFrames(tabId, type, extra) {
+  let ids = [];
+  try {
+    ids = await frameIds(tabId);
+  } catch {
+    ids = [0];
+  }
+  const ordered = [];
+  if (state.frameId != null && ids.includes(state.frameId)) ordered.push(state.frameId);
+  ids.forEach((id) => {
+    if (!ordered.includes(id)) ordered.push(id);
+  });
+  const collected = [];
+  for (const frameId of ordered) {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { type, ...extra }, { frameId });
+      if (response?.ok) collected.push({ frameId, response });
+    } catch {
+      /* This frame has no JobPilot listener yet. */
+    }
+  }
+  if (type === "SCAN" || type === "EXTRACT_JD") return bestScan(collected);
+  if (!collected.length) return null;
+  state.frameId = collected[0].frameId;
+  return collected[0].response;
+}
+
+async function injectFrames(tabId) {
+  const ids = await frameIds(tabId);
+  const failures = [];
+  for (const frameId of ids) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId, frameIds: [frameId] },
+        files: ["inject.js"]
+      });
+      let ready = false;
+      let error = "";
+      for (let attempt = 0; attempt < 25 && !ready && !error; attempt += 1) {
+        const [probe] = await chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => ({ ready: !!globalThis.__jobpilotReady, error: globalThis.__jobpilotError || "" })
+        });
+        ready = !!probe?.result?.ready;
+        error = probe?.result?.error || "";
+        if (!ready && !error) await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+      if (error) throw new Error(error);
+      if (!ready) throw new Error("The page script did not start.");
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (!ids.length || failures.length === ids.length) throw failures[0] || new Error("Could not inject JobPilot.");
 }
 
 async function send(type, extra = {}) {
   const tab = await activeTab();
-  try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type, ...extra });
-    if (!response?.ok) throw new Error(response?.error || "The page did not answer.");
-    return response;
-  } catch (error) {
-    if (String(error.message || error).includes("Receiving end")) {
-      throw new Error("Refresh the page, then try again.");
+  if (tab.url && !isWebPage(tab.url)) throw new Error(connectFailureMessage(tab.url));
+  let response = await askFrames(tab.id, type, extra);
+  if (!response) {
+    try {
+      await injectFrames(tab.id);
+    } catch (error) {
+      throw new Error(connectFailureMessage(tab.url, error));
     }
-    throw error;
+    response = await askFrames(tab.id, type, extra);
   }
+  if (!response) throw new Error(connectFailureMessage(tab.url, "Receiving end does not exist."));
+  if (response.frameId != null) state.frameId = response.frameId;
+  return response;
 }
 
 function hash(value) {
