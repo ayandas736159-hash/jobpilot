@@ -1,5 +1,10 @@
+import { groqChat } from "./lib/groq.js";
+import { MODELS } from "./lib/models.js";
 import {
   DEFAULT_FILTERS,
+  applyScoreCache,
+  jobsNeedingScore,
+  jobsToNotify,
   matchJob,
   mergeJobs,
   normalizeArbeitnow,
@@ -9,7 +14,11 @@ import {
   normalizeLever,
   normalizeRemoteOk,
   normalizeRemotive,
-  normalizeRss
+  normalizeRss,
+  parseFitScores,
+  profileBrief,
+  smartMatchMessages,
+  sortByFit
 } from "./lib/jobs.js";
 
 const ALARM = "jobpilot-jobs";
@@ -113,26 +122,83 @@ async function collect(state) {
   return { jobs, errors };
 }
 
+function storageGet(key) {
+  return new Promise((resolve) => chrome.storage.local.get([key], (data) => resolve(data[key])));
+}
+
+async function scoreJobs(state, jobs) {
+  const smartOn = state.smartMatch !== false;
+  const cache = { ...(state.scores || {}) };
+  if (!smartOn) return { jobs: sortByFit(applyScoreCache(jobs, cache)), cache, tokens: 0, fallback: false, note: "" };
+  const todo = jobsNeedingScore(jobs, cache, state.smartLimit || 25);
+  if (!todo.length) return { jobs: sortByFit(applyScoreCache(jobs, cache)), cache, tokens: 0, fallback: false, note: "" };
+  const settings = await storageGet("settings");
+  const apiKey = settings?.apiKey || "";
+  if (!apiKey) {
+    return { jobs: sortByFit(applyScoreCache(jobs, cache)), cache, tokens: 0, fallback: true, note: "Smart match needs a Groq key. Keyword matches were kept." };
+  }
+  try {
+    const profile = await storageGet("profile");
+    const result = await groqChat({
+      apiKey,
+      model: MODELS.cheap.id,
+      messages: smartMatchMessages(profileBrief(profile), todo),
+      maxTokens: 1200
+    });
+    parseFitScores(result.text, todo.map((job) => job.id)).forEach((item) => {
+      cache[item.id] = { score: item.score, reason: item.reason };
+    });
+    const scoredIds = new Set(jobs.map((job) => job.id));
+    Object.keys(cache).forEach((id) => { if (!scoredIds.has(id)) delete cache[id]; });
+    return {
+      jobs: sortByFit(applyScoreCache(jobs, cache)),
+      cache,
+      tokens: result.tokens || 0,
+      fallback: false,
+      note: ""
+    };
+  } catch (error) {
+    return {
+      jobs: sortByFit(applyScoreCache(jobs, cache)),
+      cache,
+      tokens: 0,
+      fallback: true,
+      note: `Smart match skipped (${error.message}). Keyword matches were kept.`
+    };
+  }
+}
+
 async function poll(manual) {
   const state = await loadState();
   const { jobs: found, errors } = await collect(state);
   const first = !state.lastChecked;
-  const { jobs, fresh } = mergeJobs(state.jobs || [], found, Date.now());
+  const { jobs: merged, fresh } = mergeJobs(state.jobs || [], found, Date.now());
+  const scored = await scoreJobs(state, merged);
+  const jobs = scored.jobs;
+  const note = [errors.slice(0, 3).join(" · "), scored.note].filter(Boolean).join(" · ");
   const next = {
     ...state,
     jobs,
+    scores: scored.cache,
     lastChecked: Date.now(),
-    lastError: errors.slice(0, 4).join(" · ")
+    lastSmartTokens: scored.tokens,
+    lastError: note
   };
   await saveState(next);
   setBadge(jobs);
-  const notify = first ? [] : fresh.filter((job) => !job.postedAt || Date.now() - job.postedAt < 1000 * 60 * 60 * 24 * 21);
+  const recent = fresh.filter((job) => !job.postedAt || Date.now() - job.postedAt < 1000 * 60 * 60 * 24 * 21);
+  const withScores = recent.map((job) => jobs.find((item) => item.id === job.id) || job);
+  const notify = first ? [] : jobsToNotify(withScores, {
+    smartOn: state.smartMatch !== false,
+    fallback: scored.fallback,
+    threshold: state.smartThreshold ?? 60
+  });
   notify.slice(0, 5).forEach((job) => {
     chrome.notifications.create(job.id, {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon128.png"),
       title: `${job.company || "New role"} · ${job.title}`,
-      message: job.location || "Remote",
+      message: Number.isFinite(job.fit) ? `${job.fit} fit · ${job.reason || job.location || "Remote"}` : (job.location || "Remote"),
       priority: 2
     });
   });

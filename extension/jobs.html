@@ -29,6 +29,11 @@
       <label for="titles">Title keywords, one per line</label>
       <textarea id="titles"></textarea>
       <label class="check"><input id="remote" type="checkbox"> Remote only</label>
+      <label class="check"><input id="smart" type="checkbox"> Smart match (one cheap Groq call for new jobs)</label>
+      <label for="threshold">Notify at fit score</label>
+      <input id="threshold" type="number" min="0" max="100" value="60">
+      <label for="limit">Jobs scored per check</label>
+      <input id="limit" type="number" min="1" max="25" value="25">
       <label for="interval">Check every (minutes)</label>
       <input id="interval" type="number" min="15" max="180" value="30">
       <label for="boards">Company boards, one per line. Example: lever:sprinto</label>
