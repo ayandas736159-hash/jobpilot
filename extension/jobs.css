@@ -1,0 +1,13 @@
+.jobs-page { width: min(880px, calc(100% - 28px)); margin: 0 auto; padding-bottom: 40px; }
+.job {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.job header { display: flex; justify-content: space-between; gap: 12px; }
+.job .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.job.applied, .job.dismissed { opacity: 0.55; }
+details { margin: 12px 0; }
+textarea { min-height: 90px; }

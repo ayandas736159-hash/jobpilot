@@ -1,4 +1,4 @@
-import { SAMPLE_JD, analyzeResume, renderResumeHtml, resumeToText, tailorResume } from "./lib/ats.js";
+import { SAMPLE_JD, analyzeResume, renderResumeHtml, resumeToText } from "./lib/ats.js";
 import { bestScan, connectFailureMessage, isWebPage, pickTab } from "./lib/connect.js";
 import { groqAnswer, groqCheckKey, groqChoice } from "./lib/groq.js";
 import { MODELS } from "./lib/models.js";
@@ -7,6 +7,7 @@ import { textToPdfBytes } from "./lib/pdf-write.js";
 import { planFromProposals, proposeField } from "./lib/plan.js";
 import { defaultProfile, profileCorpus } from "./lib/profile.js";
 import { assessAnswer, buildAnswerMessages } from "./lib/prompts.js";
+import { tailorWithGroq } from "./lib/tailor-ai.js";
 import { estimateMessages } from "./lib/tokens.js";
 
 const $ = (id) => document.getElementById(id);
@@ -409,24 +410,55 @@ $("analyze").addEventListener("click", async () => {
   setStatus("job-status", `Match ${analysis.score}%. This is keyword overlap, not a hiring decision.`);
 });
 
+function showTailor(result) {
+  state.modelCache = result.model;
+  state.tailorNotes = result;
+  $("preview").innerHTML = renderResumeHtml(result.model);
+  $("preview-wrap").hidden = false;
+  const changes = (result.changes || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  const gaps = (result.gaps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  $("tailor-notes").innerHTML = `${changes ? `<h3>What changed</h3><ul>${changes}</ul>` : ""}
+    ${gaps ? `<h3>Gaps left off the resume</h3><ul>${gaps}</ul>` : "<p class=\"muted\">No extra gaps were listed.</p>"}`;
+}
+
 $("tailor").addEventListener("click", async () => {
   await ready;
-  const resume = state.profile.resumeText || $("p-resume").value;
+  readProfileForm();
+  const resume = state.profile.resumeText;
   const jd = $("jd").value.trim();
   if (!resume || !jd) {
     setStatus("job-status", "Add a resume and a job description first.");
     return;
   }
-  const analysis = analyzeResume(resume, jd);
-  state.analysis = analysis;
-  paintScore(analysis);
-  const model = tailorResume(resume, jd, tickedTerms());
-  state.modelCache = model;
-  $("preview").innerHTML = renderResumeHtml(model);
-  $("preview-wrap").hidden = false;
-  setStatus("job-status", "Reordered your real bullets and skills. No new jobs or numbers were added.");
+  if (!state.settings.apiKey) {
+    setStatus("job-status", "Add your Groq key in Settings. Tailoring uses the cheaper model and your own key.");
+    return;
+  }
+  const cacheKey = `tailor:${hash(`${jd.slice(0, 1500)}|${resume.slice(0, 300)}`)}`;
+  const cached = await storageGet("local", [cacheKey]);
+  if (cached[cacheKey]?.model) {
+    showTailor(cached[cacheKey]);
+    setStatus("job-status", "Loaded the tailored resume saved for this job description.");
+    return;
+  }
+  setStatus("job-status", "Tailoring with GPT-OSS 20B. One call, using only facts from your profile…");
+  try {
+    const result = await tailorWithGroq({ apiKey: state.settings.apiKey, profile: state.profile, jd });
+    showTailor(result);
+    state.tokens += result.tokens || 0;
+    $("tokens").textContent = `Tokens this session: ${state.tokens}`;
+    await storageSet("local", { [cacheKey]: { model: result.model, changes: result.changes, gaps: result.gaps } });
+    setStatus("job-status", "Tailored from your real experience. New employers, numbers, and tools were not added.");
+  } catch (error) {
+    setStatus("job-status", error.message);
+  }
 });
 
+$("copy").addEventListener("click", async () => {
+  if (!state.modelCache) return;
+  await navigator.clipboard.writeText(resumeToText(state.modelCache));
+  setStatus("job-status", "Copied the resume text.");
+});
 $("pdf").addEventListener("click", () => {
   if (!state.modelCache) return;
   download("Padmanava_Das_Resume.pdf", textToPdfBytes(resumeToText(state.modelCache)), "application/pdf");
@@ -643,4 +675,33 @@ $("test-key").addEventListener("click", async () => {
   }
 });
 
-const ready = loadAll();
+$("open-jobs").addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("jobs.html") });
+});
+$("check-jobs").addEventListener("click", async () => {
+  setStatus("jobs-status", "Checking public boards…");
+  const result = await chrome.runtime.sendMessage({ type: "CHECK_JOBS" });
+  setStatus("jobs-status", result?.ok
+    ? `${result.added} new matching job${result.added === 1 ? "" : "s"}. Open the dashboard to review them.`
+    : (result?.error || "Check failed."));
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, info) => {
+  if (info.status !== "complete") return;
+  const data = await storageGet("session", ["pendingAutofill"]);
+  if (!data.pendingAutofill || data.pendingAutofill.tabId !== tabId) return;
+  await storageSet("session", { pendingAutofill: null });
+  document.querySelector("[data-tab='fill']").click();
+  $("scan").click();
+});
+
+async function consumePendingTailor() {
+  const data = await storageGet("local", ["pendingTailor"]);
+  if (!data.pendingTailor?.jd) return;
+  $("jd").value = data.pendingTailor.jd;
+  document.querySelector("[data-tab='job']").click();
+  setStatus("job-status", `Loaded ${data.pendingTailor.title || "a job"}. Press Tailor for this job.`);
+  await storageSet("local", { pendingTailor: null });
+}
+
+const ready = loadAll().then(() => consumePendingTailor());
