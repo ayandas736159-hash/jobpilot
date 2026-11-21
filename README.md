@@ -31,7 +31,7 @@ Settings has a custom model id if an account still has an older model. Multiple-
 5. Open the side panel and paste a Groq API key under Settings.
 6. The sample profile is already filled from Padmanava’s public resume. Work authorization, notice period, and salary are blank on purpose.
 
-To update after a pull: `git pull`, then on `chrome://extensions` click Reload on JobPilot. A normal page refresh is not required. Scan talks to the focused application tab and injects into its frames if the script is not there yet.
+To update from a ZIP: download the repository ZIP, replace the old `extension` folder with the one inside the ZIP, then on `chrome://extensions` click Reload on JobPilot. From git, `git pull` and reload the extension the same way. Reloading the extension is what picks up a new version. Refreshing only the job page does not.
 
 Content scripts run on `http` and `https` pages. To try the included forms, serve the site (`npm start`) and open:
 

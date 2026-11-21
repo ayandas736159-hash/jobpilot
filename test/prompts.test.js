@@ -15,14 +15,16 @@ const question = "Tell us about one internship that taught you something useful.
 test("the internship question is shaped as a story and pulls SoluLab numbers", () => {
   assert.equal(detectQuestionShape(question).id, "story");
   const facts = buildFactsBlock(defaultProfile(), question);
-  const primary = facts.slice(facts.indexOf("PRIMARY STORY"), facts.indexOf("ALTERNATE"));
+  const primary = facts.split("OTHER ROLES")[0];
   assert.match(primary, /SoluLab/);
   assert.match(primary, /760/);
   assert.match(primary, /1,370|1370/);
+  assert.match(primary, /B\.Tech CSE/);
+  assert.match(primary, /2026/);
   assert.doesNotMatch(primary, /Foundertruth/);
 });
 
-test("answer messages keep the rules, the examples, and the word range", () => {
+test("answer messages stay short and still carry the rules", () => {
   const messages = buildAnswerMessages({
     question,
     profile: defaultProfile(),
@@ -31,14 +33,13 @@ test("answer messages keep the rules, the examples, and the word range", () => {
     wordMin: 80,
     wordMax: 150
   });
-  assert.equal(messages[0].role, "system");
+  assert.equal(messages.length, 2);
   assert.match(messages[0].content, /Do not invent/);
+  assert.match(messages[1].content, /80-150 words/);
+  assert.match(messages[1].content, /SoluLab/);
+  assert.equal(messages[1].content.includes("gsk_"), false);
+  assert.ok(messages[1].content.length < 2500);
   assert.equal(FEW_SHOTS.length, 3);
-  assert.equal(messages.length, 1 + FEW_SHOTS.length * 2 + 1);
-  const last = messages[messages.length - 1].content;
-  assert.match(last, /80-150 words/);
-  assert.match(last, /responsible for/);
-  assert.equal(last.includes("gsk_"), false);
   assert.match(SYSTEM_PROMPT, /passionate/);
 });
 
